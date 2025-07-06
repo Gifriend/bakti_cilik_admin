@@ -37,7 +37,6 @@ export default function ChildrenList({ motherId, adminId }: ChildrenListProps) {
   const refreshGrowthRecords = () => {
     setShowAddGrowth(false)
     setSelectedChild(null)
-    // Force refresh of growth records by re-rendering the component
     loadChildren()
   }
 

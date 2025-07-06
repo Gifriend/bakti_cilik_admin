@@ -5,7 +5,8 @@ import { useAuth } from "@/contexts/auth-context"
 import { getAllMothers, type User } from "@/lib/firestore"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Users, Plus, Baby, LogOut, UserCheck } from "lucide-react"
+import { Users, Plus, Baby, LogOut, UserCheck, AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import AddChildForm from "./add-child-form"
 import ChildrenList from "./children-list"
 
@@ -14,6 +15,7 @@ export default function AdminInterface() {
   const [selectedMother, setSelectedMother] = useState<User | null>(null)
   const [showAddChild, setShowAddChild] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
   const { user, logout } = useAuth()
 
   useEffect(() => {
@@ -22,10 +24,14 @@ export default function AdminInterface() {
 
   const loadMothers = async () => {
     try {
+      setError("")
+      console.log("Loading mothers...")
       const mothersData = await getAllMothers()
       setMothers(mothersData)
-    } catch (error) {
+      console.log("Mothers loaded successfully:", mothersData.length)
+    } catch (error: any) {
       console.error("Error loading mothers:", error)
+      setError(error.message || "Failed to load mothers data")
     } finally {
       setLoading(false)
     }
@@ -41,7 +47,6 @@ export default function AdminInterface() {
 
   const refreshData = () => {
     loadMothers()
-    // Reset form
     setShowAddChild(false)
   }
 
@@ -81,6 +86,20 @@ export default function AdminInterface() {
       </div>
 
       <div className="max-w-7xl mx-auto p-6">
+        {/* Error Alert */}
+        {error && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              {error}
+              <br />
+              <span className="text-sm">
+                Please check your Firestore security rules and make sure you have proper permissions.
+              </span>
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Mothers List */}
           <div className="lg:col-span-1">
@@ -97,7 +116,7 @@ export default function AdminInterface() {
                   <div className="text-center py-8 text-gray-500">
                     <Users className="h-12 w-12 mx-auto mb-3 opacity-30" />
                     <p>No mothers found</p>
-                    <p className="text-sm">Register mothers first</p>
+                    <p className="text-sm">Check Firestore permissions</p>
                   </div>
                 ) : (
                   <div className="space-y-2 max-h-96 overflow-y-auto">
@@ -164,11 +183,7 @@ export default function AdminInterface() {
                 )}
 
                 {/* Children List */}
-                <ChildrenList
-                  motherId={selectedMother.uid}
-                  adminId={user?.uid || ""}
-                  key={selectedMother.uid} // Force re-render when mother changes
-                />
+                <ChildrenList motherId={selectedMother.uid} adminId={user?.uid || ""} key={selectedMother.uid} />
               </div>
             ) : (
               <Card className="h-96">

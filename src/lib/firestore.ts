@@ -30,9 +30,12 @@ export interface GrowthRecord {
 // User functions
 export const getAllMothers = async (): Promise<User[]> => {
   try {
+    console.log("Fetching mothers from Firestore...")
     const usersRef = collection(db, "users")
     const q = query(usersRef, where("role", "==", "mother"))
     const querySnapshot = await getDocs(q)
+
+    console.log("Found", querySnapshot.docs.length, "mothers")
 
     return querySnapshot.docs.map((doc) => ({
       uid: doc.id,
@@ -48,11 +51,13 @@ export const getAllMothers = async (): Promise<User[]> => {
 // Children functions
 export const addChild = async (childData: Omit<Child, "id" | "createdAt">): Promise<string> => {
   try {
+    console.log("Adding child:", childData)
     const childrenRef = collection(db, "children")
     const docRef = await addDoc(childrenRef, {
       ...childData,
       createdAt: Timestamp.now(),
     })
+    console.log("Child added with ID:", docRef.id)
     return docRef.id
   } catch (error) {
     console.error("Error adding child:", error)
@@ -62,9 +67,12 @@ export const addChild = async (childData: Omit<Child, "id" | "createdAt">): Prom
 
 export const getChildrenByMother = async (motherId: string): Promise<Child[]> => {
   try {
+    console.log("Fetching children for mother:", motherId)
     const childrenRef = collection(db, "children")
     const q = query(childrenRef, where("motherId", "==", motherId))
     const querySnapshot = await getDocs(q)
+
+    console.log("Found", querySnapshot.docs.length, "children")
 
     return querySnapshot.docs.map((doc) => ({
       id: doc.id,
@@ -83,11 +91,13 @@ export const addGrowthRecord = async (
   recordData: Omit<GrowthRecord, "id" | "recordAt">,
 ): Promise<string> => {
   try {
+    console.log("Adding growth record for child:", childId, recordData)
     const growthRecordRef = collection(db, "children", childId, "growthRecord")
     const docRef = await addDoc(growthRecordRef, {
       ...recordData,
       recordAt: Timestamp.now(),
     })
+    console.log("Growth record added with ID:", docRef.id)
     return docRef.id
   } catch (error) {
     console.error("Error adding growth record:", error)
@@ -97,9 +107,12 @@ export const addGrowthRecord = async (
 
 export const getGrowthRecords = async (childId: string): Promise<GrowthRecord[]> => {
   try {
+    console.log("Fetching growth records for child:", childId)
     const growthRecordRef = collection(db, "children", childId, "growthRecord")
     const q = query(growthRecordRef, orderBy("month", "asc"))
     const querySnapshot = await getDocs(q)
+
+    console.log("Found", querySnapshot.docs.length, "growth records")
 
     return querySnapshot.docs.map((doc) => ({
       id: doc.id,
