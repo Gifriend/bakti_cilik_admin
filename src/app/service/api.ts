@@ -5,29 +5,42 @@ export const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-})
+});
 
 api.interceptors.request.use(
   (config) => {
-    const token = getCookieValue("access_token")
+    const token = getCookieValue("access_token");
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`
+      config.headers.Authorization = `Bearer ${token}`;
     }
-    return config
+    return config;
   },
   (error) => {
-    return Promise.reject(error)
-  },
-)
+    return Promise.reject(error);
+  }
+);
 
-const getCookieValue = (name: string): string | null => {
-  if (typeof window === "undefined") return null
-  const cookies = document.cookie.split(";")
+// Function to get cookie value
+export const getCookieValue = (name: string): string | null => {
+  if (typeof window === "undefined") return null;
+  const cookies = document.cookie.split(";");
   for (const cookie of cookies) {
-    const [cookieName, cookieValue] = cookie.split("=").map((c) => c.trim())
+    const [cookieName, cookieValue] = cookie.split("=").map((c) => c.trim());
     if (cookieName === name) {
-      return cookieValue
+      return cookieValue;
     }
   }
-  return null
-}
+  return null;
+};
+
+// function to save cookie value
+export const setCookie = (
+  name: string,
+  value: string,
+  days: number = 7
+): void => {
+  const date = new Date();
+  date.setTime(date.getTime() + days * 24 * 60 * 60 * 1000);
+  const expires = `expires=${date.toUTCString()}`;
+  document.cookie = `${name}=${value};${expires};path=/`;
+};
