@@ -3,7 +3,7 @@
 import { useAuth } from "@/contexts/auth-context"
 import { useEffect, useState } from "react"
 import AdminDashboard from "@/components/admin-dashboard"
-import LoginForm from "@/components/login-form"
+import LoginForm from "@/app/login/components/LoginForm"
 
 export default function AdminPage() {
   const { user, loading } = useAuth()
