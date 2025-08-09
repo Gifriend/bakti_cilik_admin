@@ -124,3 +124,36 @@ export const getGrowthRecords = async (childId: string): Promise<GrowthRecord[]>
     throw error
   }
 }
+
+export const getCompleteGrowthRecords = async (childId: string): Promise<GrowthRecord[]> => {
+  const growthRecordRef = collection(db, "children", childId, "growthRecord")
+  const q = query(growthRecordRef, orderBy("month", "asc"))
+  const snapshot = await getDocs(q)
+
+  const map = new Map<number, GrowthRecord>()
+  snapshot.forEach(doc => {
+  const data = doc.data() as GrowthRecord
+  map.set(data.month, {
+    id: doc.id,
+    ...data,
+    recordAt: (data.recordAt && typeof (data.recordAt as any).toDate === "function")
+      ? (data.recordAt as any).toDate()
+      : (data.recordAt ?? new Date()),
+  })
+})
+
+  // Pastikan semua bulan 1–60 terisi
+  const completeList: GrowthRecord[] = []
+  for (let i = 1; i <= 60; i++) {
+    completeList.push(
+      map.get(i) ?? {
+        month: i,
+        height: "",
+        inputBy: "",
+        recordAt: new Date(),
+      }
+    )
+  }
+
+  return completeList
+}

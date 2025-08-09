@@ -101,9 +101,9 @@ export default function AdminDashboard() {
                   <AddChildForm
                     motherId={selectedMother.uid}
                     adminId={user?.uid || ""}
-                    onSuccess={() => {
+                    onSuccess={ async() => {
                       setShowAddChild(false)
-                      // Refresh children list
+                      await loadMothers()
                     }}
                     onCancel={() => setShowAddChild(false)}
                   />

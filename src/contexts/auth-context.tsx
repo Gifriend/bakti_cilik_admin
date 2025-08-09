@@ -2,11 +2,16 @@
 
 import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
-import { type User, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth"
-import { auth } from "@/lib/firebase"
+import { api } from "@/app/service/api" 
+import Cookies from "js-cookie"
+
+interface UserData {
+  email: string
+  name: string
+}
 
 interface AuthContextType {
-  user: User | null
+  user: UserData | null
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
   loading: boolean
@@ -16,55 +21,54 @@ const AuthContext = createContext<AuthContextType | null>(null)
 
 export const useAuth = () => {
   const context = useContext(AuthContext)
-  if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider")
-  }
+  if (!context) throw new Error("useAuth must be used within an AuthProvider")
   return context
 }
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<UserData | null>(null)
   const [loading, setLoading] = useState(true)
 
   const login = async (email: string, password: string): Promise<void> => {
     try {
-      console.log("Attempting login with:", email) // Debug log
-      await signInWithEmailAndPassword(auth, email, password)
-      console.log("Login successful") // Debug log
+      const res = await api.post("/auth/register", { email, password })
+      const { access_token, user } = res.data
+
+      // simpan token di cookie
+      Cookies.set("access_token", access_token, { secure: true, sameSite: "strict" })
+
+      // simpan user di state
+      setUser(user)
     } catch (error) {
-      console.error("Login error:", error)
+      console.error("Registrasi gagal:", error)
       throw error
     }
   }
 
   const logout = async (): Promise<void> => {
-    try {
-      await signOut(auth)
-    } catch (error) {
-      console.error("Logout error:", error)
-      throw error
-    }
+    Cookies.remove("access_token")
+    setUser(null)
   }
 
-  useEffect(() => {
-    console.log("Setting up auth listener") // Debug log
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      console.log("Auth state changed:", user?.email || "No user") // Debug log
-      setUser(user)
-      setLoading(false)
-    })
+  // useEffect(() => {
+  //   const checkAuth = async () => {
+  //     try {
+  //       const token = Cookies.get("access_token")
+  //       if (token) {
+  //         const res = await api.get("/auth/me") // endpoint cek user 
+  //         setUser(res.data)
+  //       }
+  //     } catch (error) {
+  //       console.error("Auth check failed:", error)
+  //       setUser(null)
+  //     } finally {
+  //       setLoading(false)
+  //     }
+  //   }
+  //   checkAuth()
+  // }, [])
 
-    return unsubscribe
-  }, [])
-
-  const value: AuthContextType = {
-    user,
-    login,
-    logout,
-    loading,
-  }
-
-  console.log("AuthProvider rendering, loading:", loading, "user:", user?.email) // Debug log
+  const value: AuthContextType = { user, login, logout, loading }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

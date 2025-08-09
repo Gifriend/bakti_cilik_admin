@@ -23,7 +23,7 @@ export default function LoginForm() {
     setError("")
     setLoading(true)
 
-    console.log("Form submitted, login function:", typeof login) // Debug log
+    console.log("Form submitted, login function:", typeof login) // 
 
     try {
       await login(email, password)

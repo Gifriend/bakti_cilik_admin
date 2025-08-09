@@ -5,8 +5,8 @@ import { getChildrenByMother, type Child } from "@/lib/firestore"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Plus, Baby } from "lucide-react"
-import AddGrowthRecordForm from "./add-growth-record-form"
 import GrowthRecordsList from "./growth-records-list"
+import AddGrowthRecordModal from "./AddGrowthRecordModal" 
 
 interface ChildrenListProps {
   motherId: string
@@ -16,6 +16,7 @@ interface ChildrenListProps {
 export default function ChildrenList({ motherId, adminId }: ChildrenListProps) {
   const [children, setChildren] = useState<Child[]>([])
   const [selectedChild, setSelectedChild] = useState<Child | null>(null)
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null)
   const [showAddGrowth, setShowAddGrowth] = useState(false)
   const [loading, setLoading] = useState(true)
 
@@ -34,9 +35,20 @@ export default function ChildrenList({ motherId, adminId }: ChildrenListProps) {
     }
   }
 
-  const refreshGrowthRecords = () => {
+  const handleOpenAddGrowth = (child: Child, month?: number) => {
+    setSelectedChild(child)
+    setSelectedMonth(month ?? null)
+    setShowAddGrowth(true)
+  }
+
+  const handleCloseModal = () => {
     setShowAddGrowth(false)
     setSelectedChild(null)
+    setSelectedMonth(null)
+  }
+
+  const handleSuccess = () => {
+    handleCloseModal()
     loadChildren()
   }
 
@@ -64,61 +76,45 @@ export default function ChildrenList({ motherId, adminId }: ChildrenListProps) {
         </CardHeader>
       </Card>
 
-      {children.length === 0 ? (
-        <Card>
-          <CardContent className="flex items-center justify-center h-40">
-            <div className="text-center text-gray-500">
-              <Baby className="h-12 w-12 mx-auto mb-3 opacity-30" />
-              <p className="font-medium">No children found</p>
-              <p className="text-sm">Add a child to get started</p>
+      {children.map((child) => (
+        <Card key={child.id} className="border-l-4 border-l-blue-500">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Baby className="h-5 w-5 text-blue-600" />
+                  {child.name}
+                </CardTitle>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => handleOpenAddGrowth(child)}
+                className="bg-orange-600 hover:bg-orange-700"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Growth
+              </Button>
             </div>
+          </CardHeader>
+          <CardContent>
+            <GrowthRecordsList
+              childId={child.id!}
+              childName={child.name}
+              onAddRecord={(month) => handleOpenAddGrowth(child, month)}
+            />
           </CardContent>
         </Card>
-      ) : (
-        children.map((child) => (
-          <Card key={child.id} className="border-l-4 border-l-blue-500">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Baby className="h-5 w-5 text-blue-600" />
-                    {child.name}
-                  </CardTitle>
-                  <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
-                    <span>Gender: {child.gender}</span>
-                    <span>Added: {child.createdAt.toLocaleDateString()}</span>
-                  </div>
-                </div>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setSelectedChild(child)
-                    setShowAddGrowth(true)
-                  }}
-                  className="bg-orange-600 hover:bg-orange-700"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Growth
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <GrowthRecordsList childId={child.id!} />
-            </CardContent>
-          </Card>
-        ))
-      )}
+      ))}
 
       {showAddGrowth && selectedChild && (
-        <AddGrowthRecordForm
+        <AddGrowthRecordModal
+          open={showAddGrowth}
+          onClose={handleCloseModal}
           childId={selectedChild.id!}
           childName={selectedChild.name}
           adminId={adminId}
-          onSuccess={refreshGrowthRecords}
-          onCancel={() => {
-            setShowAddGrowth(false)
-            setSelectedChild(null)
-          }}
+          initialMonth={selectedMonth ?? undefined}
+          onSuccess={handleSuccess}
         />
       )}
     </div>
