@@ -25,6 +25,7 @@ import { AddChildForm } from "./AddChildForm"
 import { AddGrowthRecordModal } from "./AddGrowthRecordModal"
 import { AdminGrowthRecords } from "./AdminGrowthRecord"
 import { growthApi, type ChildInfo } from "@/app/service/growth-api"
+import { adminApi, type Parent } from "@/app/service/admin-api"
 import { PWAStatus } from "@/components/PWAStatus"
 import { getCookieValue } from "@/app/service/api"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -52,6 +53,7 @@ interface AdminStats {
 export default function AdminPage() {
   const [children, setChildren] = useState<Child[]>([])
   const [childrenInfo, setChildrenInfo] = useState<ChildInfo[]>([]) // For AdminGrowthRecords
+  const [parents, setParents] = useState<Parent[]>([]) // Add parents state for consistent counting
   const [stats, setStats] = useState<AdminStats>({
     totalChildren: 0,
     totalRecords: 0,
@@ -111,15 +113,40 @@ export default function AdminPage() {
       setLoading(true)
       setError(null)
 
-      // Load children data using the existing API
-      const childrenData = await growthApi.getMyChildren()
-      console.log("✅ Children data loaded:", childrenData.length, "children")
+      console.log("🚀 Loading admin data...")
+
+      // Load children and parents data in parallel for consistency
+      const [childrenData, parentsData] = await Promise.allSettled([
+        growthApi.getMyChildren(),
+        adminApi.getParents({ limit: 1000 }), // Get all parents for consistent counting
+      ])
+
+      // Handle children data
+      let processedChildren: ChildInfo[] = []
+      if (childrenData.status === "fulfilled") {
+        processedChildren = childrenData.value
+        console.log("✅ Children data loaded:", processedChildren.length, "children")
+      } else {
+        console.error("❌ Failed to load children:", childrenData.reason)
+      }
+
+      // Handle parents data
+      let processedParents: Parent[] = []
+      if (parentsData.status === "fulfilled") {
+        processedParents = parentsData.value
+        console.log("✅ Parents data loaded:", processedParents.length, "parents")
+      } else {
+        console.error("❌ Failed to load parents:", parentsData.reason)
+        // Set empty array but don't fail the entire load
+        processedParents = []
+      }
 
       // Set children info for AdminGrowthRecords component
-      setChildrenInfo(childrenData)
+      setChildrenInfo(processedChildren)
+      setParents(processedParents) // Store parents for consistent counting
 
       // Transform the data to match our interface for backward compatibility
-      const transformedChildren: Child[] = childrenData.map((child) => ({
+      const transformedChildren: Child[] = processedChildren.map((child) => ({
         id: child.id,
         name: child.name,
         dob: child.dob,
@@ -134,13 +161,16 @@ export default function AdminPage() {
 
       setChildren(transformedChildren)
 
-      // Calculate basic stats (will be enhanced by AdminGrowthRecords)
+      // Calculate stats with consistent parent count
       setStats({
         totalChildren: transformedChildren.length,
         totalRecords: 0, // Will be calculated by AdminGrowthRecords
-        totalParents: new Set(transformedChildren.map((child) => child.userId)).size,
+        totalParents: processedParents.length, // Use actual loaded parents count
         recentActivity: 0, // Will be calculated by AdminGrowthRecords
       })
+
+      console.log("✅ Admin data loaded successfully")
+      console.log(`📊 Stats: ${transformedChildren.length} children, ${processedParents.length} parents`)
     } catch (error) {
       console.error("Error loading admin data:", error)
       setError("Gagal memuat data admin")
@@ -199,7 +229,7 @@ export default function AdminPage() {
 
   const handleChildAdded = () => {
     setShowAddChild(false)
-    loadAdminData()
+    loadAdminData() // Reload both children and parents data
   }
 
   const handleRecordAdded = () => {
@@ -301,7 +331,7 @@ export default function AdminPage() {
           </Card>
         )}
 
-        {/* Stats Cards */}
+        {/* Stats Cards - Now shows consistent parent count */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
           <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0">
             <CardContent className="p-4 sm:p-6">
@@ -586,12 +616,13 @@ export default function AdminPage() {
         </Card>
       </div>
 
-      {/* Modals */}
+      {/* Modals - Pass parents data to AddChildForm for consistency */}
       {showAddChild && (
         <AddChildForm
           onSuccess={handleChildAdded}
           onCancel={() => setShowAddChild(false)}
           adminId={localStorage.getItem("userId") || ""}
+          existingParents={parents} // Pass parents data for consistent counting
         />
       )}
 

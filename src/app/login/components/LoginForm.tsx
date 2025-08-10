@@ -128,7 +128,7 @@ const LoginForm: React.FC = () => {
             <div className="inline-flex items-center justify-center w-12 h-12 md:w-16 md:h-16 bg-white/30 rounded-xl md:rounded-2xl mb-3 md:mb-4">
               <Shield className="w-6 h-6 md:w-8 md:h-8" />
             </div>
-            <h1 className="text-xl md:text-2xl font-bold mb-2">Selamat Datang Kembali</h1>
+            <h1 className="text-xl md:text-2xl font-bold mb-2">Selamat Datang</h1>
             <p className="text-blue-100 text-sm md:text-base">Silakan masuk ke akun Anda</p>
           </div>
 
@@ -194,17 +194,6 @@ const LoginForm: React.FC = () => {
                   </button>
                 </div>
               </div>
-
-              {/* Forgot Password Link - Mobile friendly */}
-              {/* <div className="text-right">
-                <button
-                  type="button"
-                  className="text-sm text-blue-600 hover:text-blue-700 font-medium hover:underline"
-                  onClick={(): void => console.log("Forgot password clicked")}
-                >
-                  Lupa Password?
-                </button>
-              </div> */}
 
               {/* Login Button - Mobile optimized */}
               <Button

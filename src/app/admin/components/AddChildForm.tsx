@@ -21,17 +21,20 @@ import {
   CheckCircle,
   Bug,
   Info,
+  Users,
 } from "lucide-react"
 
 interface AddChildFormProps {
   onSuccess: () => void
   onCancel: () => void
   adminId: string
+  // Add prop to pass parents data from admin page
+  existingParents?: Parent[]
 }
 
 interface FormData {
   name: string
-  gender: GenderEnum | "" // Updated to use GenderEnum
+  gender: GenderEnum | ""
   dob: string
   nik: string
   parentId: string
@@ -43,7 +46,7 @@ interface NIKValidation {
   message: string
 }
 
-export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps) {
+export function AddChildForm({ onSuccess, onCancel, adminId, existingParents }: AddChildFormProps) {
   const [formData, setFormData] = useState<FormData>({
     name: "",
     gender: "",
@@ -52,6 +55,7 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
     parentId: "",
   })
   const [parents, setParents] = useState<Parent[]>([])
+  const [allParents, setAllParents] = useState<Parent[]>([]) // Store all parents for consistent counting
   const [parentSearch, setParentSearch] = useState("")
   const [loading, setLoading] = useState(false)
   const [loadingParents, setLoadingParents] = useState(true)
@@ -87,53 +91,92 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
         addDebugLog(`❌ API connection failed: ${error instanceof Error ? error.message : "Unknown error"}`)
       }
     }
-
     testConnection()
   }, [])
 
-  // Load parents with optional search query
-  const loadParents = async (searchQuery = "") => {
+  // Load all parents first (for consistent counting), then filter for display
+  const loadAllParents = async () => {
     try {
       setLoadingParents(true)
-      setError("") // Clear any previous errors
-      addDebugLog(`Loading parents with query: "${searchQuery}"`)
+      setError("")
+      addDebugLog("Loading all parents for consistent counting...")
 
-      const parentsData = await adminApi.getParents({
-        q: searchQuery,
-        limit: 50, // Get more results for better search experience
+      // If existingParents is provided from admin page, use it
+      if (existingParents && existingParents.length > 0) {
+        addDebugLog(`✅ Using existing parents data: ${existingParents.length} parents`)
+        setAllParents(existingParents)
+        setParents(existingParents) // Show all initially
+        return
+      }
+
+      // Otherwise, load from API with high limit to get all parents
+      const allParentsData = await adminApi.getParents({
+        q: "", // No search query to get all
+        limit: 1000, // High limit to get all parents
       })
 
-      setParents(parentsData)
-      addDebugLog(`✅ Loaded ${parentsData.length} parents`)
+      setAllParents(allParentsData)
+      setParents(allParentsData) // Show all initially
+      addDebugLog(`✅ Loaded all ${allParentsData.length} parents`)
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Gagal memuat data orang tua"
-      console.error("Error loading parents:", error)
-      addDebugLog(`❌ Failed to load parents: ${errorMessage}`)
+      console.error("Error loading all parents:", error)
+      addDebugLog(`❌ Failed to load all parents: ${errorMessage}`)
       setError(errorMessage)
-      setParents([]) // Clear parents on error
+      setAllParents([])
+      setParents([])
     } finally {
       setLoadingParents(false)
     }
   }
 
-  // Handle search with debouncing
+  // Filter parents based on search query (client-side filtering for consistency)
+  const filterParents = (searchQuery: string) => {
+    if (!searchQuery.trim()) {
+      setParents(allParents)
+      addDebugLog(`Showing all ${allParents.length} parents`)
+      return
+    }
+
+    const query = searchQuery.toLowerCase()
+    const filtered = allParents.filter(
+      (parent) => parent.name.toLowerCase().includes(query) || parent.email.toLowerCase().includes(query),
+    )
+
+    setParents(filtered)
+    addDebugLog(`Filtered to ${filtered.length} parents from ${allParents.length} total`)
+  }
+
+  // Handle search with debouncing (now uses client-side filtering)
   const handleSearchChange = (value: string) => {
     setParentSearch(value)
     addDebugLog(`Search changed to: "${value}"`)
 
-    // Clear selected parent if search changes
+    // Clear selected parent if search changes and parent is not in filtered results
     if (formData.parentId) {
-      setFormData((prev) => ({ ...prev, parentId: "" }))
+      const selectedParentStillVisible = allParents.some(
+        (parent) =>
+          parent.id.toString() === formData.parentId &&
+          (parent.name.toLowerCase().includes(value.toLowerCase()) ||
+            parent.email.toLowerCase().includes(value.toLowerCase()) ||
+            !value.trim()),
+      )
+
+      if (!selectedParentStillVisible) {
+        setFormData((prev) => ({ ...prev, parentId: "" }))
+        addDebugLog("Cleared selected parent as it's not visible in search results")
+      }
     }
 
-    // Debounce API calls to avoid too many requests
+    // Clear previous timeout
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current)
     }
 
+    // Debounce the filtering
     searchTimeoutRef.current = setTimeout(() => {
-      loadParents(value)
-    }, 300) // 300ms debounce
+      filterParents(value)
+    }, 150) // Shorter debounce for client-side filtering
   }
 
   // Validate NIK with debouncing
@@ -162,7 +205,6 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
       isValid: null,
       message: "Memvalidasi NIK...",
     })
-
     addDebugLog(`Validating NIK: ${nik}`)
 
     try {
@@ -189,7 +231,6 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
     // Only allow numbers and limit to 16 characters
     const cleanValue = value.replace(/\D/g, "").slice(0, 16)
     handleInputChange("nik", cleanValue)
-
     addDebugLog(`NIK changed to: ${cleanValue} (length: ${cleanValue.length})`)
 
     // Clear previous validation timeout
@@ -220,7 +261,7 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
 
   // Load initial data on component mount
   useEffect(() => {
-    loadParents() // Load initial data without search query
+    loadAllParents()
 
     // Cleanup timeouts on unmount
     return () => {
@@ -231,7 +272,7 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
         clearTimeout(nikValidationTimeoutRef.current)
       }
     }
-  }, [])
+  }, [existingParents])
 
   // NIK validation function
   const isNIKFormatValid = (nik: string): boolean => {
@@ -245,7 +286,6 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
     setError("")
     setSuccess("")
     setLoading(true)
-
     addDebugLog("🚀 Starting form submission...")
 
     try {
@@ -288,7 +328,6 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
         addDebugLog(`❌ Validation failed: DOB is too old - "${formData.dob}"`)
         throw new Error("Tanggal lahir tidak valid (terlalu lama)")
       }
-
       addDebugLog(`✅ DOB validation passed: "${formData.dob}" -> ${dobDate.toISOString()}`)
 
       if (!formData.nik.trim()) {
@@ -338,7 +377,6 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
       addDebugLog(`  - userId: ${childRequest.userId} (type: ${typeof childRequest.userId})`)
 
       const response = await adminApi.addChild(childRequest)
-
       addDebugLog("✅ Child added successfully")
       setSuccess("Data anak berhasil ditambahkan!")
 
@@ -373,7 +411,7 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
-  const selectedParent = parents.find((parent) => parent.id.toString() === formData.parentId)
+  const selectedParent = allParents.find((parent) => parent.id.toString() === formData.parentId)
 
   // Check if form is valid for submission
   const isFormValid = () => {
@@ -401,18 +439,6 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
     }
 
     return valid
-  }
-
-  // Helper function to get gender display text
-  const getGenderDisplayText = (gender: GenderEnum | ""): string => {
-    switch (gender) {
-      case "MALE":
-        return "Laki-laki"
-      case "FEMALE":
-        return "Perempuan"
-      default:
-        return ""
-    }
   }
 
   return (
@@ -452,6 +478,13 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
             </div>
             <div className="mt-2 pt-2 border-t border-gray-300">
               <div className="text-xs text-gray-600">
+                <strong>Parent Data Stats:</strong>
+              </div>
+              <div className="text-xs text-gray-600">
+                Total Parents: {allParents.length} | Filtered: {parents.length} | Selected:{" "}
+                {formData.parentId || "None"}
+              </div>
+              <div className="text-xs text-gray-600">
                 <strong>Current Form State:</strong>
               </div>
               <div className="text-xs text-gray-600">
@@ -476,7 +509,8 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
                         {
                           formData,
                           nikValidation,
-                          parentsCount: parents.length,
+                          totalParents: allParents.length,
+                          filteredParents: parents.length,
                           isFormValid: isFormValid(),
                         },
                         null,
@@ -501,6 +535,10 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
             <div className="flex items-center gap-2 text-lg font-semibold text-gray-800 border-b pb-2">
               <User className="h-5 w-5 text-purple-600" />
               Pilih Orang Tua
+              <div className="ml-auto flex items-center gap-2 text-sm font-normal text-gray-600">
+                <Users className="h-4 w-4" />
+                <span>{allParents.length} total orang tua</span>
+              </div>
             </div>
 
             <div className="space-y-3">
@@ -523,17 +561,40 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
               {loadingParents ? (
                 <div className="flex items-center justify-center py-4">
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  <span className="text-sm text-gray-500">Mencari data orang tua...</span>
+                  <span className="text-sm text-gray-500">Memuat data orang tua...</span>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-gray-700">
-                    Pilih dari daftar: ({parents.length} orang tua ditemukan)
-                  </Label>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium text-gray-700">
+                      Pilih dari daftar: ({parents.length} dari {allParents.length} orang tua)
+                    </Label>
+                    {parentSearch && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setParentSearch("")
+                          filterParents("")
+                        }}
+                        className="text-xs text-blue-600 hover:text-blue-700"
+                      >
+                        Tampilkan Semua
+                      </Button>
+                    )}
+                  </div>
                   <div className="max-h-40 overflow-y-auto border rounded-lg">
                     {parents.length === 0 ? (
                       <div className="p-4 text-center text-gray-500 text-sm">
-                        {parentSearch ? "Tidak ada orang tua yang cocok dengan pencarian" : "Tidak ada data orang tua"}
+                        {parentSearch ? (
+                          <div>
+                            <div>Tidak ada orang tua yang cocok dengan pencarian "{parentSearch}"</div>
+                            <div className="text-xs mt-1">Total {allParents.length} orang tua tersedia</div>
+                          </div>
+                        ) : (
+                          "Tidak ada data orang tua"
+                        )}
                       </div>
                     ) : (
                       parents.map((parent) => (

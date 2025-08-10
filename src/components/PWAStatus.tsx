@@ -140,7 +140,7 @@ export function PWAStatus() {
           )}
 
           {/* Actions */}
-          <div className="flex gap-2">
+          {/* <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={handleExportData} className="flex-1 text-xs bg-transparent">
               <Download className="h-3 w-3 mr-1" />
               Ekspor
@@ -149,7 +149,7 @@ export function PWAStatus() {
               <Upload className="h-3 w-3 mr-1" />
               Impor
             </Button>
-          </div>
+          </div> */}
 
           {!isOnline && (
             <div className="bg-yellow-50 border border-yellow-200 rounded p-2">
