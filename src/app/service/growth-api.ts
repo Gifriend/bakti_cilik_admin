@@ -115,7 +115,7 @@ export const growthApi = {
       } else if (response.data && typeof response.data === "object") {
         // Check for nested data structure
         if ("data" in response.data && Array.isArray(response.data.data)) {
-          childrenData = response.data.data
+          childrenData = response.data.data 
           console.log("✅ Using response.data.data array")
         } else if ("children" in response.data && Array.isArray(response.data.children)) {
           childrenData = response.data.children

@@ -66,21 +66,12 @@ class LocalStorageService {
     return {
       children: [],
       growthRecords: {},
-      parents: this.getDefaultParents(),
+      parents: [],
       lastSync: new Date().toISOString(),
       version: STORAGE_VERSION,
     }
   }
 
-  private getDefaultParents(): Parent[] {
-    return [
-      { id: 1, name: "Budi Santoso", email: "budi@example.com" },
-      { id: 2, name: "Siti Nurhaliza", email: "siti@example.com" },
-      { id: 3, name: "Ahmad Rahman", email: "ahmad@example.com" },
-      { id: 4, name: "Dewi Sartika", email: "dewi@example.com" },
-      { id: 5, name: "Rudi Hermawan", email: "rudi@example.com" },
-    ]
-  }
 
   private saveStorageData(data: LocalStorageData): void {
     try {
