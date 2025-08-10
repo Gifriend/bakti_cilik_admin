@@ -55,7 +55,7 @@ const LoginForm: React.FC = () => {
       setCookie('access_token', response.data.accessToken);
       
       // Redirect ke dashboard
-      router.push('/dashboard');
+      router.push('/growth-stats');
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || 'Login gagal. Silakan coba lagi.';
       setError(errorMessage);

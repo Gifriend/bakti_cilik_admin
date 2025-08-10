@@ -50,23 +50,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null)
   }
 
-  // useEffect(() => {
-  //   const checkAuth = async () => {
-  //     try {
-  //       const token = Cookies.get("access_token")
-  //       if (token) {
-  //         const res = await api.get("/auth/me") // endpoint cek user 
-  //         setUser(res.data)
-  //       }
-  //     } catch (error) {
-  //       console.error("Auth check failed:", error)
-  //       setUser(null)
-  //     } finally {
-  //       setLoading(false)
-  //     }
-  //   }
-  //   checkAuth()
-  // }, [])
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const token = Cookies.get("access_token")
+        if (token) {
+          const res = await api.get("/auth/me") // endpoint cek user 
+          setUser(res.data)
+        }
+      } catch (error) {
+        console.error("Auth check failed:", error)
+        setUser(null)
+      } finally {
+        setLoading(false)
+      }
+    }
+    checkAuth()
+  }, [])
 
   const value: AuthContextType = { user, login, logout, loading }
 
