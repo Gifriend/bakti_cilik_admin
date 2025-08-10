@@ -96,10 +96,14 @@ export const growthApi = {
   // Get children for current user - UPDATED to use new endpoint
   getMyChildren: async (): Promise<ChildInfo[]> => {
     try {
-      console.log("🚀 Fetching children from /users/children endpoint...")
+      console.log("🚀 Fetching children from /admin/children endpoint...")
 
-      // Try new API endpoint first
-      const response = await api.get("/users/children")
+      // Try admin endpoint with query parameters
+      const queryParams = new URLSearchParams()
+      queryParams.append("limit", "100") // Get more children
+      queryParams.append("page", "1")
+
+      const response = await api.get(`/admin/children?${queryParams.toString()}`)
       console.log("✅ Raw API Response:", response)
       console.log("✅ Response data:", response.data)
       console.log("✅ Response data type:", typeof response.data)
@@ -184,6 +188,43 @@ export const growthApi = {
 
       // Generate mock WHO curves for demonstration
       const whoCurves = generateMockWHOCurves(child.gender)
+
+      return {
+        records: records.map((r) => ({
+          date: r.date,
+          height: r.height,
+          weight: r.weight,
+          ageInMonthsAtRecord: r.ageInMonthsAtRecord,
+          heightZScore: r.heightZScore,
+        })),
+        whoCurves,
+      }
+    }
+  },
+
+  // Fetch weight chart data - NEW ENDPOINT
+  getWeightChart: async (childId: number): Promise<GrowthChartData> => {
+    try {
+      console.log(`🚀 Fetching weight chart for child ${childId}...`)
+
+      // Try API first
+      const response = await api.get<GetGrowthChartResponse>(`/growth/${childId}/weight-chart`)
+      console.log("✅ Weight chart data received from API")
+
+      return response.data.data
+    } catch (error: any) {
+      console.warn("❌ API unavailable for weight chart data, using localStorage:", error.message)
+
+      // Fallback to localStorage with mock WHO curves for weight
+      const records = localStorageService.getGrowthRecords(childId)
+      const child = localStorageService.getChildById(childId)
+
+      if (!child) {
+        throw new Error("Data anak tidak ditemukan")
+      }
+
+      // Generate mock WHO curves for weight
+      const whoCurves = generateMockWHOWeightCurves(child.gender)
 
       return {
         records: records.map((r) => ({
@@ -330,7 +371,6 @@ export const growthApi = {
     try {
       console.log(`🚀 Searching child by NIK: ${nik}...`)
 
-      // Try API first - menggunakan endpoint yang sudah ada
       const allChildren = await growthApi.getMyChildren()
       const foundChild = allChildren.find((child) => child.nik === nik)
 
@@ -364,6 +404,68 @@ export const growthApi = {
       return null
     }
   },
+
+  // Search children with query - NEW FUNCTION
+  searchChildren: async (query?: string, limit?: number, page?: number): Promise<ChildInfo[]> => {
+    try {
+      console.log(`🚀 Searching children with query: ${query}...`)
+
+      const queryParams = new URLSearchParams()
+      if (query && query.trim()) {
+        queryParams.append("q", query.trim())
+      }
+      queryParams.append("limit", (limit || 50).toString())
+      queryParams.append("page", (page || 1).toString())
+
+      const response = await api.get(`/admin/children?${queryParams.toString()}`)
+      console.log("✅ Children search results received from API")
+
+      // Handle different response formats
+      let childrenData: ChildInfo[] = []
+
+      if (Array.isArray(response.data)) {
+        childrenData = response.data
+      } else if (response.data && typeof response.data === "object") {
+        if ("data" in response.data && Array.isArray(response.data.data)) {
+          childrenData = response.data.data
+        } else if ("children" in response.data && Array.isArray(response.data.children)) {
+          childrenData = response.data.children
+        }
+      }
+
+      return childrenData || []
+    } catch (error: any) {
+      console.warn("❌ API unavailable for children search, using localStorage:", error.message)
+
+      // Fallback to localStorage
+      const children = localStorageService.getChildren()
+
+      if (!query || !query.trim()) {
+        return children.map((child) => ({
+          id: child.id,
+          name: child.name,
+          dob: child.dob,
+          nik: child.nik,
+          gender: child.gender,
+          userId: child.userId,
+        }))
+      }
+
+      const searchQuery = query.toLowerCase()
+      const filteredChildren = children.filter(
+        (child) => child.name.toLowerCase().includes(searchQuery) || child.nik.includes(searchQuery),
+      )
+
+      return filteredChildren.map((child) => ({
+        id: child.id,
+        name: child.name,
+        dob: child.dob,
+        nik: child.nik,
+        gender: child.gender,
+        userId: child.userId,
+      }))
+    }
+  },
 }
 
 // Helper function to generate mock WHO curves
@@ -385,6 +487,30 @@ function generateMockWHOCurves(gender: "MALE" | "FEMALE"): WHOCurve[] {
       return {
         ageInMonths,
         value: Math.max(30, baseHeight + zAdjustment), // Minimum 30cm
+      }
+    }),
+  }))
+}
+
+// Helper function to generate mock WHO weight curves
+function generateMockWHOWeightCurves(gender: "MALE" | "FEMALE"): WHOCurve[] {
+  const zLevels = [-3, -2, -1, 0, 1, 2, 3]
+
+  return zLevels.map((z) => ({
+    z,
+    points: Array.from({ length: 25 }, (_, i) => {
+      const ageInMonths = i
+      // Mock weight values based on typical growth patterns
+      const baseWeight =
+        gender === "MALE"
+          ? 3.3 + ageInMonths * 0.5 // Boys baseline weight
+          : 3.2 + ageInMonths * 0.45 // Girls baseline weight
+
+      const zAdjustment = z * 0.8 // Each Z-score represents ~0.8kg difference
+
+      return {
+        ageInMonths,
+        value: Math.max(1, baseWeight + zAdjustment), // Minimum 1kg
       }
     }),
   }))

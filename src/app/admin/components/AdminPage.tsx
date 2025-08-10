@@ -6,12 +6,28 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Users, UserPlus, Activity, Search, BarChart3, Baby, TrendingUp, Shield, Eye } from "lucide-react"
+import {
+  Users,
+  UserPlus,
+  Activity,
+  Search,
+  BarChart3,
+  Baby,
+  TrendingUp,
+  Shield,
+  Eye,
+  AlertCircle,
+  Loader2,
+  Plus,
+} from "lucide-react"
 import { UserMenu } from "@/components/UserMenu"
 import { AddChildForm } from "./AddChildForm"
 import { AddGrowthRecordModal } from "./AddGrowthRecordModal"
-import { growthApi } from "@/app/service/growth-api"
+import { AdminGrowthRecords } from "./AdminGrowthRecord"
+import { growthApi, type ChildInfo } from "@/app/service/growth-api"
 import { PWAStatus } from "@/components/PWAStatus"
+import { getCookieValue } from "@/app/service/api"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 interface Child {
   id: number
@@ -23,6 +39,7 @@ interface Child {
   recordsCount: number
   lastRecord?: string
   userId: number
+  nik?: string
 }
 
 interface AdminStats {
@@ -34,6 +51,7 @@ interface AdminStats {
 
 export default function AdminPage() {
   const [children, setChildren] = useState<Child[]>([])
+  const [childrenInfo, setChildrenInfo] = useState<ChildInfo[]>([]) // For AdminGrowthRecords
   const [stats, setStats] = useState<AdminStats>({
     totalChildren: 0,
     totalRecords: 0,
@@ -43,24 +61,50 @@ export default function AdminPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [showAddChild, setShowAddChild] = useState(false)
   const [showAddRecord, setShowAddRecord] = useState(false)
+  const [showAddRecordWithSearch, setShowAddRecordWithSearch] = useState(false)
   const [selectedChild, setSelectedChild] = useState<Child | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [userRole, setUserRole] = useState<string | null>(null)
 
+  // Tambahkan state baru setelah state yang sudah ada
+  const [searchNIK, setSearchNIK] = useState("")
+  const [searchResult, setSearchResult] = useState<Child | null>(null)
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
+
   // Check user role
   useEffect(() => {
-    const role = localStorage.getItem("userRole") || "ORANG_TUA"
+    const role = localStorage.getItem("userRole") || "USER"
+    const token = localStorage.getItem("authToken") || getCookieValue("access_token")
+
+    console.log("Current role:", role, "Token:", token ? "exists" : "missing")
+
     setUserRole(role)
+
+    // Jika tidak ada token, redirect ke login
+    if (!token) {
+      window.location.href = "/login"
+      return
+    }
   }, [])
 
   const isAdmin = userRole && ["ADMIN", "PEGAWAI", "DOKTER"].includes(userRole)
 
+  console.log("Admin check - userRole:", userRole, "isAdmin:", isAdmin)
+
   useEffect(() => {
     if (isAdmin) {
       loadAdminData()
+    } else if (userRole && userRole !== "USER") {
+      // Jika role sudah di-set tapi bukan admin, tunggu sebentar
+      setTimeout(() => {
+        if (!["ADMIN", "PEGAWAI", "DOKTER"].includes(userRole)) {
+          console.log("Access denied for role:", userRole)
+        }
+      }, 1000)
     }
-  }, [isAdmin])
+  }, [isAdmin, userRole])
 
   const loadAdminData = async () => {
     try {
@@ -69,8 +113,12 @@ export default function AdminPage() {
 
       // Load children data using the existing API
       const childrenData = await growthApi.getMyChildren()
+      console.log("✅ Children data loaded:", childrenData.length, "children")
 
-      // Transform the data to match our interface
+      // Set children info for AdminGrowthRecords component
+      setChildrenInfo(childrenData)
+
+      // Transform the data to match our interface for backward compatibility
       const transformedChildren: Child[] = childrenData.map((child) => ({
         id: child.id,
         name: child.name,
@@ -78,25 +126,74 @@ export default function AdminPage() {
         gender: child.gender,
         parentName: "Parent Name", // You'll need to get this from your API
         parentEmail: "parent@email.com", // You'll need to get this from your API
-        recordsCount: 0, // You'll need to get this from your API
-        lastRecord: undefined, // You'll need to get this from your API
+        recordsCount: 0, // This will be calculated by AdminGrowthRecords
+        lastRecord: undefined, // This will be calculated by AdminGrowthRecords
         userId: child.userId || 0,
+        nik: child.nik,
       }))
 
       setChildren(transformedChildren)
 
-      // Calculate basic stats
+      // Calculate basic stats (will be enhanced by AdminGrowthRecords)
       setStats({
         totalChildren: transformedChildren.length,
-        totalRecords: transformedChildren.reduce((sum, child) => sum + child.recordsCount, 0),
+        totalRecords: 0, // Will be calculated by AdminGrowthRecords
         totalParents: new Set(transformedChildren.map((child) => child.userId)).size,
-        recentActivity: 0, // You can calculate this based on recent records
+        recentActivity: 0, // Will be calculated by AdminGrowthRecords
       })
     } catch (error) {
       console.error("Error loading admin data:", error)
       setError("Gagal memuat data admin")
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Tambahkan fungsi ini setelah loadAdminData
+  const searchChildByNIK = async (nik: string) => {
+    if (!nik || nik.length !== 16) {
+      setSearchError("NIK harus berupa 16 digit angka")
+      return
+    }
+
+    try {
+      setSearchLoading(true)
+      setSearchError(null)
+      setSearchResult(null)
+
+      // Cari di data children yang sudah ada
+      const foundChild = children.find((child) => child.nik === nik)
+
+      if (foundChild) {
+        setSearchResult(foundChild)
+      } else {
+        // Jika tidak ditemukan di data lokal, coba dari API
+        const allChildren = await growthApi.getMyChildren()
+        const foundInAPI = allChildren.find((child) => child.nik === nik)
+
+        if (foundInAPI) {
+          const transformedChild: Child = {
+            id: foundInAPI.id,
+            name: foundInAPI.name,
+            dob: foundInAPI.dob,
+            gender: foundInAPI.gender,
+            nik: foundInAPI.nik,
+            parentName: "Parent Name",
+            parentEmail: "parent@email.com",
+            recordsCount: 0,
+            lastRecord: undefined,
+            userId: foundInAPI.userId || 0,
+          }
+          setSearchResult(transformedChild)
+        } else {
+          setSearchError("Anak dengan NIK tersebut tidak ditemukan")
+        }
+      }
+    } catch (error) {
+      console.error("Error searching child by NIK:", error)
+      setSearchError("Gagal mencari data anak")
+    } finally {
+      setSearchLoading(false)
     }
   }
 
@@ -107,6 +204,7 @@ export default function AdminPage() {
 
   const handleRecordAdded = () => {
     setShowAddRecord(false)
+    setShowAddRecordWithSearch(false)
     setSelectedChild(null)
     loadAdminData()
   }
@@ -143,12 +241,13 @@ export default function AdminPage() {
     )
   }
 
-  if (loading) {
+  if (loading || !userRole) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Memuat data admin...</p>
+          <p className="text-xs text-gray-400 mt-2">Role: {userRole || "Loading..."}</p>
         </div>
       </div>
     )
@@ -177,6 +276,14 @@ export default function AdminPage() {
                 <UserPlus className="h-4 w-4 mr-1 sm:mr-2" />
                 <span className="hidden sm:inline">Tambah Anak</span>
                 <span className="sm:hidden">Tambah</span>
+              </Button>
+              <Button
+                onClick={() => setShowAddRecordWithSearch(true)}
+                className="bg-orange-600 hover:bg-orange-700 shadow-lg text-sm sm:text-base px-3 sm:px-4"
+              >
+                <Plus className="h-4 w-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Tambah Data</span>
+                <span className="sm:hidden">Data</span>
               </Button>
               <UserMenu />
             </div>
@@ -262,17 +369,123 @@ export default function AdminPage() {
               </TabsList>
 
               <TabsContent value="children" className="space-y-6">
-                {/* Search */}
-                <div className="flex gap-4">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <Input
-                      placeholder="Cari anak, orang tua, atau email..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
+                {/* Search by NIK */}
+                <div className="space-y-4">
+                  <div className="flex gap-4">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                      <Input
+                        placeholder="Cari berdasarkan nama, orang tua, atau email..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
                   </div>
+
+                  {/* NIK Search Section */}
+                  <Card className="bg-blue-50 border-blue-200">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Search className="h-5 w-5 text-blue-600" />
+                        Pencarian Cepat dengan NIK
+                      </CardTitle>
+                      <CardDescription>Masukkan NIK (16 digit) untuk mencari data anak secara langsung</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex gap-3">
+                        <div className="flex-1">
+                          <Input
+                            placeholder="Masukkan NIK (16 digit)"
+                            value={searchNIK}
+                            onChange={(e) => {
+                              setSearchNIK(e.target.value)
+                              if (searchError) setSearchError(null)
+                              if (searchResult) setSearchResult(null)
+                            }}
+                            maxLength={16}
+                            className="bg-white"
+                          />
+                        </div>
+                        <Button
+                          onClick={() => searchChildByNIK(searchNIK)}
+                          disabled={searchLoading || !searchNIK}
+                          className="bg-blue-600 hover:bg-blue-700"
+                        >
+                          {searchLoading ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Search className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+
+                      {/* Search Error */}
+                      {searchError && (
+                        <Alert variant="destructive" className="mt-3">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>{searchError}</AlertDescription>
+                        </Alert>
+                      )}
+
+                      {/* Search Result */}
+                      {searchResult && (
+                        <Card className="mt-3 bg-white border-green-200">
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                                    searchResult.gender === "MALE" ? "bg-blue-100" : "bg-pink-100"
+                                  }`}
+                                >
+                                  <Baby
+                                    className={`h-5 w-5 ${
+                                      searchResult.gender === "MALE" ? "text-blue-600" : "text-pink-600"
+                                    }`}
+                                  />
+                                </div>
+                                <div>
+                                  <h4 className="font-semibold text-green-800">{searchResult.name}</h4>
+                                  <p className="text-sm text-green-600">
+                                    NIK: {searchResult.nik} •{" "}
+                                    {searchResult.gender === "MALE" ? "Laki-laki" : "Perempuan"}
+                                  </p>
+                                  <p className="text-xs text-green-500">
+                                    Lahir: {new Date(searchResult.dob).toLocaleDateString("id-ID")} • Usia:{" "}
+                                    {calculateAge(searchResult.dob)} bulan
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setSelectedChild(searchResult)
+                                    setShowAddRecord(true)
+                                  }}
+                                  className="bg-orange-50 hover:bg-orange-100 text-orange-700 border-orange-200"
+                                >
+                                  <Activity className="h-4 w-4 mr-1" />
+                                  Tambah Data
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    window.location.href = `/growth-stats?childId=${searchResult.id}`
+                                  }}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </CardContent>
+                  </Card>
                 </div>
 
                 {/* Children List */}
@@ -349,7 +562,6 @@ export default function AdminPage() {
                                   size="sm"
                                   variant="outline"
                                   onClick={() => {
-                                    // Navigate to child's growth stats page
                                     window.location.href = `/growth-stats?childId=${child.id}`
                                   }}
                                 >
@@ -366,11 +578,8 @@ export default function AdminPage() {
               </TabsContent>
 
               <TabsContent value="records" className="space-y-6">
-                <div className="text-center py-12">
-                  <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-600 mb-2">Rekam Pertumbuhan</h3>
-                  <p className="text-gray-500">Fitur ini akan menampilkan semua rekam pertumbuhan dari semua anak</p>
-                </div>
+                {/* Use the new AdminGrowthRecords component */}
+                <AdminGrowthRecords children={childrenInfo} />
               </TabsContent>
             </Tabs>
           </CardContent>
@@ -396,6 +605,16 @@ export default function AdminPage() {
           onSuccess={handleRecordAdded}
           childId={selectedChild.id}
           childName={selectedChild.name}
+          adminId={localStorage.getItem("userId") || ""}
+        />
+      )}
+
+      {showAddRecordWithSearch && (
+        <AddGrowthRecordModal
+          open={showAddRecordWithSearch}
+          onClose={() => setShowAddRecordWithSearch(false)}
+          onSuccess={handleRecordAdded}
+          allowChildSelection={true}
           adminId={localStorage.getItem("userId") || ""}
         />
       )}
