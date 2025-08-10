@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Users, Plus, Baby } from "lucide-react"
 import AddChildForm from "./add-child-form"
-import ChildrenList from "./children-list"
+import ChildrenList from "../../../components/children-list"
 
 export default function AdminDashboard() {
   const [mothers, setMothers] = useState<User[]>([])

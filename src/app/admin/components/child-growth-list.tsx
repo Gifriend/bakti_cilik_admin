@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react"
 import { getCompleteGrowthRecords, type GrowthRecord } from "@/lib/firestore"
-import { Button } from "./ui/button"
 import { ChevronDown, ChevronRight, TrendingUp } from "lucide-react"
 
 interface ChildGrowthListProps {

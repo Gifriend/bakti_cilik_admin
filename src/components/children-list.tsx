@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Plus, Baby } from "lucide-react"
 import GrowthRecordsList from "./growth-records-list"
-import AddGrowthRecordModal from "./AddGrowthRecordModal" 
+import AddGrowthRecordModal from "../app/admin/components/AddGrowthRecordModal" 
 
 interface ChildrenListProps {
   motherId: string

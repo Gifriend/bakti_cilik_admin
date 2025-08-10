@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Users, Plus, Baby, LogOut, UserCheck, AlertCircle } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import AddChildForm from "./add-child-form"
-import ChildrenList from "./children-list"
+import ChildrenList from "../../../components/children-list"
 
 export default function AdminInterface() {
   const [mothers, setMothers] = useState<User[]>([])

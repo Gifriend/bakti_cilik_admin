@@ -1,25 +1,21 @@
 import { api } from "./api"
 
 export interface GrowthRecord {
-  id: number
-  childId: number
   date: string
-  ageInMonths: number
   height: number
   weight: number
-  headCircumference?: number
-  createdAt: string
+  ageInMonthsAtRecord: number
+  heightZScore: number | null
+}
+
+export interface WHOCurvePoint {
+  ageInMonths: number
+  value: number
 }
 
 export interface WHOCurve {
-  ageInMonths: number
-  zMinus3: number
-  zMinus2: number
-  zMinus1: number
-  z0: number
-  z1: number
-  z2: number
-  z3: number
+  z: number
+  points: WHOCurvePoint[]
 }
 
 export interface GrowthChartData {
@@ -27,7 +23,24 @@ export interface GrowthChartData {
   whoCurves: WHOCurve[]
 }
 
-export interface Child {
+export interface GrowthStats {
+  _count: { _all: number }
+  _avg: { height: number; weight: number; heightZScore: number }
+  _min: {
+    date: string
+    height: number
+    weight: number
+    heightZScore: number
+  }
+  _max: {
+    date: string
+    height: number
+    weight: number
+    heightZScore: number
+  }
+}
+
+export interface ChildInfo {
   id: number
   name: string
   birthDate: string
@@ -35,21 +48,21 @@ export interface Child {
 }
 
 export const growthApi = {
-  // Fetch growth chart data for a specific child
+  // Fetch growth chart data - will return error if no child or no access
   getGrowthChart: async (childId: number): Promise<GrowthChartData> => {
     const response = await api.get(`/growth/${childId}/growth-chart`)
     return response.data.data
   },
 
-  // Fetch list of children (assuming this endpoint exists)
-  getChildren: async (): Promise<Child[]> => {
-    const response = await api.get("/children")
+  // Fetch growth stats - will return error if no child or no access
+  getGrowthStats: async (childId: number): Promise<GrowthStats> => {
+    const response = await api.get(`/growth/${childId}/growth-stats`)
     return response.data.data
   },
 
-  // Fetch growth stats for a child
-  getGrowthStats: async (childId: number) => {
-    const response = await api.get(`/growth/${childId}/stats`)
+  // Fetch growth records - will return error if no child or no access
+  getGrowthRecords: async (childId: number): Promise<GrowthRecord[]> => {
+    const response = await api.get(`/growth/${childId}/growth-records`)
     return response.data.data
   },
 }

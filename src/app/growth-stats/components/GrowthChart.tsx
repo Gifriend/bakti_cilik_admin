@@ -12,19 +12,44 @@ interface GrowthChartProps {
 }
 
 export function GrowthChart({ data, childName, chartType }: GrowthChartProps) {
-  // Combine records and WHO curves data
-  const chartData = data.whoCurves.map((curve) => {
-    const record = data.records.find((r) => Math.abs(r.ageInMonths - curve.ageInMonths) < 0.5)
-    return {
-      ageInMonths: curve.ageInMonths,
-      actualValue: record ? (chartType === "height" ? record.height : record.weight) : null,
-      zMinus3: chartType === "height" ? curve.zMinus3 : null,
-      zMinus2: chartType === "height" ? curve.zMinus2 : null,
-      z0: chartType === "height" ? curve.z0 : null,
-      z2: chartType === "height" ? curve.z2 : null,
-      z3: chartType === "height" ? curve.z3 : null,
-    }
-  })
+  // Transform WHO curves data to match the chart format
+  const transformWHOCurves = () => {
+    const ageMonthsSet = new Set<number>()
+
+    // Collect all age months from WHO curves
+    data.whoCurves.forEach((curve) => {
+      curve.points.forEach((point) => {
+        ageMonthsSet.add(point.ageInMonths)
+      })
+    })
+
+    // Sort age months
+    const sortedAgeMonths = Array.from(ageMonthsSet).sort((a, b) => a - b)
+
+    // Create chart data structure
+    return sortedAgeMonths.map((ageInMonths) => {
+      const chartPoint: any = { ageInMonths }
+
+      // Add WHO curve values for each z-score
+      data.whoCurves.forEach((curve) => {
+        const point = curve.points.find((p) => p.ageInMonths === ageInMonths)
+        if (point && chartType === "height") {
+          chartPoint[`z${curve.z}`] = point.value
+        }
+      })
+
+      // Add actual child data if available
+      const record = data.records.find((r) => Math.abs(r.ageInMonthsAtRecord - ageInMonths) < 0.5)
+
+      if (record) {
+        chartPoint.actualValue = chartType === "height" ? record.height : record.weight
+      }
+
+      return chartPoint
+    })
+  }
+
+  const chartData = transformWHOCurves()
 
   const chartConfig = {
     actualValue: {
@@ -32,23 +57,23 @@ export function GrowthChart({ data, childName, chartType }: GrowthChartProps) {
       color: "hsl(var(--chart-1))",
     },
     z0: {
-      label: "Median WHO",
+      label: "Median WHO (Z=0)",
       color: "hsl(var(--chart-2))",
     },
-    zMinus2: {
-      label: "-2 SD",
+    "z-2": {
+      label: "Z=-2 SD",
       color: "hsl(var(--chart-3))",
     },
     z2: {
-      label: "+2 SD",
+      label: "Z=+2 SD",
       color: "hsl(var(--chart-4))",
     },
-    zMinus3: {
-      label: "-3 SD",
+    "z-3": {
+      label: "Z=-3 SD",
       color: "hsl(var(--chart-5))",
     },
     z3: {
-      label: "+3 SD",
+      label: "Z=+3 SD",
       color: "hsl(var(--chart-5))",
     },
   }
@@ -77,51 +102,55 @@ export function GrowthChart({ data, childName, chartType }: GrowthChartProps) {
                 tickFormatter={(value) => `${value}${chartType === "height" ? " cm" : " kg"}`}
               />
 
-              {/* WHO Reference Lines */}
-              <Line
-                type="monotone"
-                dataKey="zMinus3"
-                stroke="var(--color-zMinus3)"
-                strokeWidth={1}
-                strokeDasharray="5 5"
-                dot={false}
-                connectNulls={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="zMinus2"
-                stroke="var(--color-zMinus2)"
-                strokeWidth={1}
-                strokeDasharray="3 3"
-                dot={false}
-                connectNulls={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="z0"
-                stroke="var(--color-z0)"
-                strokeWidth={2}
-                dot={false}
-                connectNulls={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="z2"
-                stroke="var(--color-z2)"
-                strokeWidth={1}
-                strokeDasharray="3 3"
-                dot={false}
-                connectNulls={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="z3"
-                stroke="var(--color-z3)"
-                strokeWidth={1}
-                strokeDasharray="5 5"
-                dot={false}
-                connectNulls={false}
-              />
+              {/* WHO Reference Lines - Only show for height charts */}
+              {chartType === "height" && (
+                <>
+                  <Line
+                    type="monotone"
+                    dataKey="z-3"
+                    stroke="var(--color-z-3)"
+                    strokeWidth={1}
+                    strokeDasharray="5 5"
+                    dot={false}
+                    connectNulls={false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="z-2"
+                    stroke="var(--color-z-2)"
+                    strokeWidth={1}
+                    strokeDasharray="3 3"
+                    dot={false}
+                    connectNulls={false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="z0"
+                    stroke="var(--color-z0)"
+                    strokeWidth={2}
+                    dot={false}
+                    connectNulls={false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="z2"
+                    stroke="var(--color-z2)"
+                    strokeWidth={1}
+                    strokeDasharray="3 3"
+                    dot={false}
+                    connectNulls={false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="z3"
+                    stroke="var(--color-z3)"
+                    strokeWidth={1}
+                    strokeDasharray="5 5"
+                    dot={false}
+                    connectNulls={false}
+                  />
+                </>
+              )}
 
               {/* Actual child data */}
               <Line
