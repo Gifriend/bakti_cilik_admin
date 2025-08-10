@@ -304,7 +304,7 @@ export default function AdminPage() {
                 className="bg-green-600 hover:bg-green-700 shadow-lg text-sm sm:text-base px-3 sm:px-4"
               >
                 <UserPlus className="h-4 w-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Tambah Anak</span>
+                <span className="hidden sm:inline">Tambah Data Anak</span>
                 <span className="sm:hidden">Tambah</span>
               </Button>
               <Button
@@ -312,7 +312,7 @@ export default function AdminPage() {
                 className="bg-orange-600 hover:bg-orange-700 shadow-lg text-sm sm:text-base px-3 sm:px-4"
               >
                 <Plus className="h-4 w-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Tambah Data</span>
+                <span className="hidden sm:inline">Perbarui Data Anak</span>
                 <span className="sm:hidden">Data</span>
               </Button>
               <UserMenu />
@@ -401,7 +401,7 @@ export default function AdminPage() {
               <TabsContent value="children" className="space-y-6">
                 {/* Search by NIK */}
                 <div className="space-y-4">
-                  <div className="flex gap-4">
+                  {/* <div className="flex gap-4">
                     <div className="relative flex-1">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                       <Input
@@ -411,7 +411,7 @@ export default function AdminPage() {
                         className="pl-10"
                       />
                     </div>
-                  </div>
+                  </div> */}
 
                   {/* NIK Search Section */}
                   <Card className="bg-blue-50 border-blue-200">
