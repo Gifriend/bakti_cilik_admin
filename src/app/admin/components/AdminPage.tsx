@@ -117,7 +117,7 @@ export default function AdminPage() {
 
       // Load children and parents data in parallel for consistency
       const [childrenData, parentsData] = await Promise.allSettled([
-        growthApi.getMyChildren(),
+        growthApi.getMyChildrenAdmin(),
         adminApi.getParents({ limit: 1000 }), // Get all parents for consistent counting
       ])
 
@@ -198,7 +198,7 @@ export default function AdminPage() {
         setSearchResult(foundChild)
       } else {
         // Jika tidak ditemukan di data lokal, coba dari API
-        const allChildren = await growthApi.getMyChildren()
+        const allChildren = await growthApi.getMyChildrenAdmin()
         const foundInAPI = allChildren.find((child) => child.nik === nik)
 
         if (foundInAPI) {

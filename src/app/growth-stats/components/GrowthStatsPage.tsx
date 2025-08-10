@@ -43,7 +43,7 @@ export default function GrowthStatsPage() {
         return
       }
 
-      const childrenResponse = await growthApi.getMyChildren()
+      const childrenResponse = await growthApi.getMyChildrenUsers()
       console.log("🔍 Raw children response:", childrenResponse)
       console.log("🔍 Response type:", typeof childrenResponse)
       console.log("🔍 Is array:", Array.isArray(childrenResponse))

@@ -94,12 +94,79 @@ export interface SearchChildByNIKResponse {
 
 export const growthApi = {
   // Get children for current user - UPDATED to use new endpoint
-  getMyChildren: async (): Promise<ChildInfo[]> => {
+  getMyChildrenUsers: async (): Promise<ChildInfo[]> => {
     try {
       console.log("🚀 Fetching children from /users/children endpoint...")
 
       // Try new API endpoint first
       const response = await api.get("/users/children")
+      console.log("✅ Raw API Response:", response)
+      console.log("✅ Response data:", response.data)
+      console.log("✅ Response data type:", typeof response.data)
+      console.log("✅ Is response.data array:", Array.isArray(response.data))
+
+      // Handle different response formats
+      let childrenData: ChildInfo[] = []
+
+      if (Array.isArray(response.data)) {
+        // Direct array in response.data
+        childrenData = response.data
+        console.log("✅ Using direct response.data array")
+      } else if (response.data && typeof response.data === "object") {
+        // Check for nested data structure
+        if ("data" in response.data && Array.isArray(response.data.data)) {
+          childrenData = response.data.data 
+          console.log("✅ Using response.data.data array")
+        } else if ("children" in response.data && Array.isArray(response.data.children)) {
+          childrenData = response.data.children
+          console.log("✅ Using response.data.children array")
+        } else {
+          console.warn("⚠️ Unexpected API response format:", response.data)
+          childrenData = []
+        }
+      } else {
+        console.warn("⚠️ Response.data is not an object or array:", response.data)
+        childrenData = []
+      }
+
+      console.log("✅ Processed children data:", childrenData)
+      console.log("✅ Final children count:", childrenData.length)
+
+      return childrenData || []
+    } catch (error: any) {
+      console.warn("❌ API unavailable, using localStorage fallback:", error.message)
+
+      // Enhanced error logging
+      if (error.response) {
+        console.error("API Error Details:", {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          data: error.response.data,
+          url: error.config?.url,
+        })
+      }
+
+      // Fallback to localStorage
+      const localChildren = localStorageService.getChildren()
+      console.log("📱 Using localStorage data:", localChildren.length, "children found")
+
+      return localChildren.map((child) => ({
+        id: child.id,
+        name: child.name,
+        dob: child.dob,
+        nik: child.nik,
+        gender: child.gender,
+        userId: child.userId,
+      }))
+    }
+  },
+
+  getMyChildrenAdmin: async (): Promise<ChildInfo[]> => {
+    try {
+      console.log("🚀 Fetching children from /admin/children endpoint...")
+
+      // Try new API endpoint first
+      const response = await api.get("/admin/children")
       console.log("✅ Raw API Response:", response)
       console.log("✅ Response data:", response.data)
       console.log("✅ Response data type:", typeof response.data)
@@ -331,7 +398,7 @@ export const growthApi = {
       console.log(`🚀 Searching child by NIK: ${nik}...`)
 
       // Try API first - menggunakan endpoint yang sudah ada
-      const allChildren = await growthApi.getMyChildren()
+      const allChildren = await growthApi.getMyChildrenAdmin()
       const foundChild = allChildren.find((child) => child.nik === nik)
 
       if (foundChild) {
