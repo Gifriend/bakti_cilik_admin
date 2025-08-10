@@ -25,7 +25,7 @@ export function GrowthChart({ data, childName, chartType }: GrowthChartProps) {
   // Transform WHO curves data to match the chart format
   const transformWHOCurves = (): ChartPoint[] => {
     const ageMonthsSet = new Set<number>()
-
+    
     // Collect all age months from WHO curves
     data.whoCurves.forEach((curve) => {
       curve.points.forEach((point) => {
@@ -51,7 +51,6 @@ export function GrowthChart({ data, childName, chartType }: GrowthChartProps) {
 
       // Add actual child data if available
       const record = data.records.find((r) => Math.abs(r.ageInMonthsAtRecord - ageInMonths) < 0.5)
-
       if (record) {
         chartPoint.actualValue = chartType === "height" ? record.height : record.weight
       }

@@ -8,14 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, Activity, Ruler, Weight, Calendar } from "lucide-react"
-import { growthApi } from "@/app/service/growth-api"
-
-interface CreateGrowthRecordData {
-  date: string
-  height: number
-  weight: number
-  // Remove headCircumference and ageInMonths - backend calculates ageInMonths
-}
+import { growthApi, type CreateGrowthRecordData } from "@/app/service/growth-api"
 
 interface AddGrowthRecordModalProps {
   open: boolean
@@ -23,7 +16,8 @@ interface AddGrowthRecordModalProps {
   onSuccess: () => void
   childId: number
   childName: string
-  adminId: string
+  childNIK?: string // Tambahkan prop baru
+  adminId?: string
   initialMonth?: number
 }
 
@@ -33,6 +27,7 @@ export function AddGrowthRecordModal({
   onSuccess,
   childId,
   childName,
+  childNIK,
   adminId,
   initialMonth,
 }: AddGrowthRecordModalProps) {
@@ -40,17 +35,36 @@ export function AddGrowthRecordModal({
     date: new Date().toISOString().split("T")[0],
     height: "",
     weight: "",
-    // Remove ageInMonths and headCircumference
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
 
+  // Reset form when modal opens
   useEffect(() => {
-    if (initialMonth) {
-      // setFormData((prev) => ({ ...prev, ageInMonths: initialMonth.toString() }))
+    if (open) {
+      setFormData({
+        date: new Date().toISOString().split("T")[0],
+        height: "",
+        weight: "",
+      })
+      setError("")
+      setSuccess("")
     }
-  }, [initialMonth])
+  }, [open])
+
+  // Set initial date based on month if provided
+  useEffect(() => {
+    if (initialMonth && open) {
+      // Calculate approximate date for the given month
+      const today = new Date()
+      const approximateDate = new Date(today.getFullYear(), today.getMonth() - (24 - initialMonth), 1)
+      setFormData((prev) => ({
+        ...prev,
+        date: approximateDate.toISOString().split("T")[0],
+      }))
+    }
+  }, [initialMonth, open])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -59,15 +73,33 @@ export function AddGrowthRecordModal({
     setLoading(true)
 
     try {
-      const recordData: CreateGrowthRecordData = {
-        date: formData.date,
-        height: Number.parseFloat(formData.height),
-        weight: Number.parseFloat(formData.weight),
-        // Remove headCircumference and ageInMonths
+      // Validate input
+      const height = Number.parseFloat(formData.height)
+      const weight = Number.parseFloat(formData.weight)
+
+      if (isNaN(height) || height <= 0 || height > 200) {
+        throw new Error("Tinggi badan harus antara 0-200 cm")
       }
 
-      // Call the actual API instead of simulation
-      const response = await growthApi.addGrowthRecord(childId, recordData)
+      if (isNaN(weight) || weight <= 0 || weight > 100) {
+        throw new Error("Berat badan harus antara 0-100 kg")
+      }
+
+      // Validate date
+      const selectedDate = new Date(formData.date)
+      const today = new Date()
+      if (selectedDate > today) {
+        throw new Error("Tanggal pengukuran tidak boleh di masa depan")
+      }
+
+      const recordData: CreateGrowthRecordData = {
+        date: formData.date,
+        height: height,
+        weight: weight,
+      }
+
+      // Call the API to add growth record
+      await growthApi.addGrowthRecord(childId, recordData)
 
       setSuccess("Data pertumbuhan berhasil ditambahkan!")
 
@@ -76,14 +108,16 @@ export function AddGrowthRecordModal({
         date: new Date().toISOString().split("T")[0],
         height: "",
         weight: "",
-        // Remove ageInMonths and headCircumference
       })
 
+      // Close modal and refresh data after short delay
       setTimeout(() => {
         onSuccess()
+        onClose()
       }, 1500)
     } catch (err: any) {
-      const errorMessage = err.response?.data?.message || err.message || "Gagal menambahkan data pertumbuhan"
+      console.error("Error adding growth record:", err)
+      const errorMessage = err.message || "Gagal menambahkan data pertumbuhan"
       setError(errorMessage)
     } finally {
       setLoading(false)
@@ -93,6 +127,8 @@ export function AddGrowthRecordModal({
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
+
+  const isFormValid = formData.date && formData.height && formData.weight
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -106,6 +142,8 @@ export function AddGrowthRecordModal({
           </DialogTitle>
           <p className="text-sm text-gray-600 mt-1">
             Menambahkan data untuk: <span className="font-semibold text-gray-800">{childName}</span>
+            {childNIK && <span className="text-blue-600"> • NIK: {childNIK}</span>}
+            {initialMonth && <span className="text-orange-600"> • Bulan ke-{initialMonth}</span>}
           </p>
         </DialogHeader>
 
@@ -198,7 +236,7 @@ export function AddGrowthRecordModal({
             </Button>
             <Button
               type="submit"
-              disabled={loading || !formData.date || !formData.height || !formData.weight}
+              disabled={loading || !isFormValid}
               className="flex-1 h-11 bg-orange-600 hover:bg-orange-700"
             >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

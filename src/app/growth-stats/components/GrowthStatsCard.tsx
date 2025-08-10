@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { TrendingUp, TrendingDown, Minus, BarChart3, Calendar, Ruler, Weight, AlertTriangle } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, BarChart3, Calendar, Ruler, Weight, AlertTriangle } from "lucide-react"
 import type { GrowthStats } from "@/app/service/growth-api"
 
 interface GrowthStatsCardProps {
@@ -21,7 +21,6 @@ export function GrowthStatsCard({ childName, stats, latestRecord }: GrowthStatsC
     if (zScore === null || zScore === undefined) {
       return { status: "N/A", color: "bg-gray-100 text-gray-800" }
     }
-
     if (zScore >= -2 && zScore <= 2) {
       return { status: "Normal", color: "bg-green-100 text-green-800" }
     } else if (zScore < -3) {
@@ -33,13 +32,11 @@ export function GrowthStatsCard({ childName, stats, latestRecord }: GrowthStatsC
     } else if (zScore > 2) {
       return { status: "Tall", color: "bg-yellow-100 text-yellow-800" }
     }
-
     return { status: "N/A", color: "bg-gray-100 text-gray-800" }
   }
 
   const getStatusIcon = (zScore: number | null | undefined) => {
     if (zScore === null || zScore === undefined) return <Minus className="h-3 w-3" />
-
     if (zScore >= -2 && zScore <= 2) {
       return <Minus className="h-3 w-3" />
     } else if (zScore < -2) {
@@ -47,7 +44,6 @@ export function GrowthStatsCard({ childName, stats, latestRecord }: GrowthStatsC
     } else if (zScore > 2) {
       return <TrendingUp className="h-3 w-3" />
     }
-
     return <Minus className="h-3 w-3" />
   }
 
@@ -82,56 +78,58 @@ export function GrowthStatsCard({ childName, stats, latestRecord }: GrowthStatsC
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 gap-4 sm:gap-6">
       {/* Current Stats Card */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5 text-blue-600" />
-            Data Terkini - {childName}
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+            <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+            <span className="truncate">Data Terkini - {childName}</span>
           </CardTitle>
-          <CardDescription className="flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
+          <CardDescription className="flex items-center gap-2 text-sm">
+            <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
             {latestRecord?.date
-              ? `Pengukuran terakhir: ${new Date(latestRecord.date).toLocaleDateString("id-ID")}`
-              : "Belum ada data pengukuran"}
+              ? `Terakhir: ${new Date(latestRecord.date).toLocaleDateString("id-ID")}`
+              : "Belum ada data"}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <CardContent className="space-y-4 p-4 sm:p-6 pt-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             {/* Height Stats */}
-            <div className="space-y-2 p-4 bg-blue-50 rounded-lg">
+            <div className="space-y-2 p-3 sm:p-4 bg-blue-50 rounded-lg">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Ruler className="h-4 w-4 text-blue-600" />
-                  <span className="text-sm font-medium">Tinggi Badan</span>
+                  <Ruler className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600" />
+                  <span className="text-xs sm:text-sm font-medium">Tinggi Badan</span>
                 </div>
-                <Badge className={heightStatus.color}>
+                <Badge className={`${heightStatus.color} text-xs`}>
                   {getStatusIcon(latestRecord?.heightZScore)}
-                  {heightStatus.status}
+                  <span className="ml-1">{heightStatus.status}</span>
                 </Badge>
               </div>
-              <div className="text-2xl font-bold text-blue-700">
+              <div className="text-xl sm:text-2xl font-bold text-blue-700">
                 {latestRecord?.height ? `${latestRecord.height} cm` : "N/A"}
               </div>
               {latestRecord?.heightZScore !== null && latestRecord?.heightZScore !== undefined && (
-                <div className="text-sm text-blue-600">Z-Score: {formatZScore(latestRecord.heightZScore)}</div>
+                <div className="text-xs sm:text-sm text-blue-600">
+                  Z-Score: {formatZScore(latestRecord.heightZScore)}
+                </div>
               )}
             </div>
 
             {/* Weight Stats */}
-            <div className="space-y-2 p-4 bg-green-50 rounded-lg">
+            <div className="space-y-2 p-3 sm:p-4 bg-green-50 rounded-lg">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Weight className="h-4 w-4 text-green-600" />
-                  <span className="text-sm font-medium">Berat Badan</span>
+                  <Weight className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
+                  <span className="text-xs sm:text-sm font-medium">Berat Badan</span>
                 </div>
-                <Badge className="bg-green-100 text-green-800">
-                  <Minus className="h-3 w-3" />
-                  Data
+                <Badge className="bg-green-100 text-green-800 text-xs">
+                  <Minus className="h-2 w-2 sm:h-3 sm:w-3" />
+                  <span className="ml-1">Data</span>
                 </Badge>
               </div>
-              <div className="text-2xl font-bold text-green-700">
+              <div className="text-xl sm:text-2xl font-bold text-green-700">
                 {latestRecord?.weight ? `${latestRecord.weight} kg` : "N/A"}
               </div>
             </div>
@@ -139,47 +137,49 @@ export function GrowthStatsCard({ childName, stats, latestRecord }: GrowthStatsC
         </CardContent>
       </Card>
 
-      {/* Aggregate Stats Card */}
+      {/* Aggregate Stats Card - Only show if there's data */}
       {stats && stats._count._all > 0 && (
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-purple-600" />
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+              <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
               Statistik Keseluruhan
             </CardTitle>
-            <CardDescription>Ringkasan dari {stats._count._all} pengukuran</CardDescription>
+            <CardDescription className="text-sm">Ringkasan dari {stats._count._all} pengukuran</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="p-3 bg-purple-50 rounded-lg">
-                <div className="font-medium text-purple-600 mb-1">Rata-rata Tinggi</div>
-                <div className="text-lg font-semibold text-purple-700">
+          <CardContent className="space-y-4 p-4 sm:p-6 pt-0">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 text-sm">
+              <div className="p-2 sm:p-3 bg-purple-50 rounded-lg">
+                <div className="font-medium text-purple-600 mb-1 text-xs sm:text-sm">Rata-rata Tinggi</div>
+                <div className="text-base sm:text-lg font-semibold text-purple-700">
                   {stats._avg?.height ? `${stats._avg.height.toFixed(1)} cm` : "N/A"}
                 </div>
               </div>
-              <div className="p-3 bg-indigo-50 rounded-lg">
-                <div className="font-medium text-indigo-600 mb-1">Rata-rata Berat</div>
-                <div className="text-lg font-semibold text-indigo-700">
+              <div className="p-2 sm:p-3 bg-indigo-50 rounded-lg">
+                <div className="font-medium text-indigo-600 mb-1 text-xs sm:text-sm">Rata-rata Berat</div>
+                <div className="text-base sm:text-lg font-semibold text-indigo-700">
                   {stats._avg?.weight ? `${stats._avg.weight.toFixed(1)} kg` : "N/A"}
                 </div>
               </div>
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <div className="font-medium text-gray-600 mb-1">Tinggi Min/Max</div>
-                <div className="text-sm font-medium">
+              <div className="p-2 sm:p-3 bg-gray-50 rounded-lg">
+                <div className="font-medium text-gray-600 mb-1 text-xs sm:text-sm">Tinggi Min/Max</div>
+                <div className="text-xs sm:text-sm font-medium">
                   {stats._min?.height && stats._max?.height ? `${stats._min.height} - ${stats._max.height} cm` : "N/A"}
                 </div>
               </div>
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <div className="font-medium text-gray-600 mb-1">Berat Min/Max</div>
-                <div className="text-sm font-medium">
+              <div className="p-2 sm:p-3 bg-gray-50 rounded-lg">
+                <div className="font-medium text-gray-600 mb-1 text-xs sm:text-sm">Berat Min/Max</div>
+                <div className="text-xs sm:text-sm font-medium">
                   {stats._min?.weight && stats._max?.weight ? `${stats._min.weight} - ${stats._max.weight} kg` : "N/A"}
                 </div>
               </div>
-              <div className="col-span-2 p-3 bg-yellow-50 rounded-lg">
-                <div className="font-medium text-yellow-700 mb-1">Rata-rata Z-Score Tinggi</div>
-                <div className="text-lg font-semibold text-yellow-800">
+              <div className="col-span-2 p-2 sm:p-3 bg-yellow-50 rounded-lg">
+                <div className="font-medium text-yellow-700 mb-1 text-xs sm:text-sm">Rata-rata Z-Score Tinggi</div>
+                <div className="text-base sm:text-lg font-semibold text-yellow-800">
                   {formatZScore(stats._avg?.heightZScore)}
-                  <span className="text-sm font-normal ml-2">({getZScoreStatus(stats._avg?.heightZScore).status})</span>
+                  <span className="text-xs sm:text-sm font-normal ml-2">
+                    ({getZScoreStatus(stats._avg?.heightZScore).status})
+                  </span>
                 </div>
               </div>
             </div>
