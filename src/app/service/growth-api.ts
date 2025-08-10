@@ -431,6 +431,67 @@ export const growthApi = {
       return null
     }
   },
+  // Search children with query - NEW FUNCTION
+  searchChildren: async (query?: string, limit?: number, page?: number): Promise<ChildInfo[]> => {
+    try {
+      console.log(`🚀 Searching children with query: ${query}...`)
+
+      const queryParams = new URLSearchParams()
+      if (query && query.trim()) {
+        queryParams.append("q", query.trim())
+      }
+      queryParams.append("limit", (limit || 50).toString())
+      queryParams.append("page", (page || 1).toString())
+
+      const response = await api.get(`/admin/children?${queryParams.toString()}`)
+      console.log("✅ Children search results received from API")
+
+      // Handle different response formats
+      let childrenData: ChildInfo[] = []
+
+      if (Array.isArray(response.data)) {
+        childrenData = response.data
+      } else if (response.data && typeof response.data === "object") {
+        if ("data" in response.data && Array.isArray(response.data.data)) {
+          childrenData = response.data.data
+        } else if ("children" in response.data && Array.isArray(response.data.children)) {
+          childrenData = response.data.children
+        }
+      }
+
+      return childrenData || []
+    } catch (error: any) {
+      console.warn("❌ API unavailable for children search, using localStorage:", error.message)
+
+      // Fallback to localStorage
+      const children = localStorageService.getChildren()
+
+      if (!query || !query.trim()) {
+        return children.map((child) => ({
+          id: child.id,
+          name: child.name,
+          dob: child.dob,
+          nik: child.nik,
+          gender: child.gender,
+          userId: child.userId,
+        }))
+      }
+
+      const searchQuery = query.toLowerCase()
+      const filteredChildren = children.filter(
+        (child) => child.name.toLowerCase().includes(searchQuery) || child.nik.includes(searchQuery),
+      )
+
+      return filteredChildren.map((child) => ({
+        id: child.id,
+        name: child.name,
+        dob: child.dob,
+        nik: child.nik,
+        gender: child.gender,
+        userId: child.userId,
+      }))
+    }
+  }
 }
 
 // Helper function to generate mock WHO curves
