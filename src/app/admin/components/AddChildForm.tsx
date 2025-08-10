@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Loader2, UserPlus, Calendar, User, Baby, Search, AlertCircle } from "lucide-react"
+import { Loader2, UserPlus, Calendar, User, Baby, Search, AlertCircle, CreditCard } from "lucide-react"
 
 interface AddChildFormProps {
   onSuccess: () => void
@@ -20,7 +20,8 @@ interface AddChildFormProps {
 interface FormData {
   name: string
   gender: "L" | "P" | ""
-  birthDate: string
+  dob: string
+  nik: string // Added NIK field
   parentId: string
 }
 
@@ -28,7 +29,8 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
   const [formData, setFormData] = useState<FormData>({
     name: "",
     gender: "",
-    birthDate: "",
+    dob: "",
+    nik: "", // Added NIK field
     parentId: "",
   })
   const [parents, setParents] = useState<Parent[]>([])
@@ -92,6 +94,13 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
     }
   }, [])
 
+  // NIK validation function
+  const validateNIK = (nik: string): boolean => {
+    // NIK should be exactly 16 digits
+    const nikRegex = /^\d{16}$/
+    return nikRegex.test(nik)
+  }
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError("")
@@ -106,8 +115,14 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
       if (!formData.gender) {
         throw new Error("Jenis kelamin harus dipilih")
       }
-      if (!formData.birthDate) {
+      if (!formData.dob) {
         throw new Error("Tanggal lahir harus diisi")
+      }
+      if (!formData.nik.trim()) {
+        throw new Error("NIK harus diisi")
+      }
+      if (!validateNIK(formData.nik.trim())) {
+        throw new Error("NIK harus berupa 16 digit angka")
       }
       if (!formData.parentId) {
         throw new Error("Orang tua harus dipilih")
@@ -115,9 +130,10 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
 
       const childData: CreateChildData = {
         name: formData.name.trim(),
-        birthDate: formData.birthDate,
+        dob: formData.dob,
+        nik: formData.nik.trim(), // Added NIK
         gender: formData.gender as "L" | "P",
-        parentId: Number.parseInt(formData.parentId),
+        userId: Number.parseInt(formData.parentId),
       }
 
       const response = await adminApi.addChild(childData)
@@ -127,7 +143,8 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
       setFormData({
         name: "",
         gender: "",
-        birthDate: "",
+        dob: "",
+        nik: "", // Reset NIK
         parentId: "",
       })
       setParentSearch("")
@@ -291,17 +308,42 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
                 </Select>
               </div>
 
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="birthDate" className="text-sm font-medium text-gray-700">
+              <div className="space-y-2">
+                <Label htmlFor="nik" className="text-sm font-medium text-gray-700">
+                  NIK (Nomor Induk Kependudukan) *
+                </Label>
+                <div className="relative">
+                  <CreditCard className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input
+                    id="nik"
+                    type="text"
+                    placeholder="Masukkan 16 digit NIK"
+                    value={formData.nik}
+                    onChange={(e) => {
+                      // Only allow numbers and limit to 16 characters
+                      const value = e.target.value.replace(/\D/g, "").slice(0, 16)
+                      handleInputChange("nik", value)
+                    }}
+                    required
+                    disabled={loading}
+                    className="h-11 pl-10"
+                    maxLength={16}
+                  />
+                </div>
+                <p className="text-xs text-gray-500">NIK harus berupa 16 digit angka</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="dob" className="text-sm font-medium text-gray-700">
                   Tanggal Lahir *
                 </Label>
                 <div className="relative">
                   <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                   <Input
-                    id="birthDate"
+                    id="dob"
                     type="date"
-                    value={formData.birthDate}
-                    onChange={(e) => handleInputChange("birthDate", e.target.value)}
+                    value={formData.dob}
+                    onChange={(e) => handleInputChange("dob", e.target.value)}
                     required
                     disabled={loading}
                     className="h-11 pl-10"
@@ -329,7 +371,9 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
                 loading ||
                 !formData.name.trim() ||
                 !formData.gender ||
-                !formData.birthDate ||
+                !formData.dob ||
+                !formData.nik.trim() ||
+                !validateNIK(formData.nik.trim()) ||
                 !formData.parentId ||
                 loadingParents
               }

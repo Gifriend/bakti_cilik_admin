@@ -2,9 +2,10 @@ import { api } from "./api"
 
 export interface CreateChildData {
   name: string
-  birthDate: string // ISO date string
-  gender: "L" | "P" // L = Laki-laki, P = Perempuan
-  parentId: number // ID of the parent user
+  dob: string // Date of birth
+  nik: string // NIK (Nomor Induk Kependudukan) - required and unique
+  gender: "L" | "P"
+  userId: number // Parent user ID
 }
 
 export interface CreateChildResponse {
@@ -12,9 +13,10 @@ export interface CreateChildResponse {
   data: {
     id: number
     name: string
-    birthDate: string
+    dob: string
+    nik: string
     gender: string
-    parentId: number
+    userId: number
     createdAt: string
     updatedAt: string
   }

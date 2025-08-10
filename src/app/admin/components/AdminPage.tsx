@@ -21,6 +21,7 @@ interface Child {
   parentEmail: string
   recordsCount: number
   lastRecord?: string
+  dob: string
 }
 
 interface AdminStats {
@@ -44,6 +45,7 @@ export default function AdminPage() {
   const [showAddRecord, setShowAddRecord] = useState(false)
   const [selectedChild, setSelectedChild] = useState<Child | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   // Check if user is admin/staff
   const isAdmin = user?.role === "ADMIN" || user?.role === "PEGAWAI" || user?.role === "DOKTER"
@@ -57,42 +59,27 @@ export default function AdminPage() {
   const loadAdminData = async () => {
     try {
       setLoading(true)
-      // Simulate API calls - replace with actual API calls
-      await new Promise((resolve) => setTimeout(resolve, 1000))
 
-      // Mock data - replace with actual API calls
+      // Get real data from your backend APIs
+      // You'll need to create these endpoints or use existing ones
+
+      // For now, we'll load children data and calculate stats
+      // You may want to create dedicated admin stats endpoints
+
+      // Mock implementation - replace with real API calls
       setStats({
-        totalChildren: 45,
-        totalRecords: 234,
-        totalParents: 38,
-        recentActivity: 12,
+        totalChildren: 0, // Will be updated when you add admin stats endpoint
+        totalRecords: 0,
+        totalParents: 0,
+        recentActivity: 0,
       })
 
-      setChildren([
-        {
-          id: 1,
-          name: "Ahmad Rizki",
-          birthDate: "2022-03-15",
-          gender: "L",
-          parentName: "Budi Santoso",
-          parentEmail: "budi@email.com",
-          recordsCount: 8,
-          lastRecord: "2024-01-15",
-        },
-        {
-          id: 2,
-          name: "Siti Aisyah",
-          birthDate: "2021-08-22",
-          gender: "P",
-          parentName: "Ani Wijaya",
-          parentEmail: "ani@email.com",
-          recordsCount: 12,
-          lastRecord: "2024-01-10",
-        },
-        // Add more mock data as needed
-      ])
+      // Load children data - you'll need to create an admin endpoint for this
+      // For now, set empty array until you create the endpoint
+      setChildren([])
     } catch (error) {
       console.error("Error loading admin data:", error)
+      setError("Gagal memuat data admin")
     } finally {
       setLoading(false)
     }
@@ -116,8 +103,8 @@ export default function AdminPage() {
       child.parentEmail.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
-  const calculateAge = (birthDate: string) => {
-    const birth = new Date(birthDate)
+  const calculateAge = (dob: string) => {
+    const birth = new Date(dob)
     const now = new Date()
     const months = (now.getFullYear() - birth.getFullYear()) * 12 + (now.getMonth() - birth.getMonth())
     return months
@@ -125,6 +112,7 @@ export default function AdminPage() {
 
   if (!isAdmin) {
     return (
+      
         <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-50 flex items-center justify-center">
           <Card className="max-w-md text-center">
             <CardHeader>
@@ -268,8 +256,7 @@ export default function AdminPage() {
                               <div>
                                 <h3 className="font-semibold text-lg">{child.name}</h3>
                                 <p className="text-gray-600">
-                                  {child.gender === "L" ? "Laki-laki" : "Perempuan"} •{calculateAge(child.birthDate)}{" "}
-                                  bulan
+                                  {child.gender === "L" ? "Laki-laki" : "Perempuan"} • {calculateAge(child.dob)} bulan
                                 </p>
                                 <p className="text-sm text-gray-500">
                                   Orang Tua: {child.parentName} ({child.parentEmail})
@@ -325,7 +312,7 @@ export default function AdminPage() {
 
         {/* Modals */}
         {showAddChild && (
-          <AddChildForm onSuccess={handleChildAdded} onCancel={() => setShowAddChild(false)} adminId={user?.id ? String(user.id) : ""} />
+          <AddChildForm onSuccess={handleChildAdded} onCancel={() => setShowAddChild(false)} adminId={String(user?.id ?? "")} />
         )}
 
         {showAddRecord && selectedChild && (
@@ -338,7 +325,7 @@ export default function AdminPage() {
             onSuccess={handleRecordAdded}
             childId={selectedChild.id}
             childName={selectedChild.name}
-            adminId={user?.id ? String(user.id) : ""}
+            adminId={String(user?.id ?? "")}
           />
         )}
       </div>

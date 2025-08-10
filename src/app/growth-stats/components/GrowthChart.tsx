@@ -11,9 +11,19 @@ interface GrowthChartProps {
   chartType: "height" | "weight"
 }
 
+interface ChartPoint {
+  ageInMonths: number
+  actualValue?: number
+  z0?: number
+  "z-2"?: number
+  z2?: number
+  "z-3"?: number
+  z3?: number
+}
+
 export function GrowthChart({ data, childName, chartType }: GrowthChartProps) {
   // Transform WHO curves data to match the chart format
-  const transformWHOCurves = () => {
+  const transformWHOCurves = (): ChartPoint[] => {
     const ageMonthsSet = new Set<number>()
 
     // Collect all age months from WHO curves
@@ -28,13 +38,14 @@ export function GrowthChart({ data, childName, chartType }: GrowthChartProps) {
 
     // Create chart data structure
     return sortedAgeMonths.map((ageInMonths) => {
-      const chartPoint: any = { ageInMonths }
+      const chartPoint: ChartPoint = { ageInMonths }
 
       // Add WHO curve values for each z-score
       data.whoCurves.forEach((curve) => {
         const point = curve.points.find((p) => p.ageInMonths === ageInMonths)
         if (point && chartType === "height") {
-          chartPoint[`z${curve.z}`] = point.value
+          const key = `z${curve.z}` as keyof ChartPoint
+          chartPoint[key] = point.value
         }
       })
 
