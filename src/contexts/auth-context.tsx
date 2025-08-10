@@ -6,8 +6,10 @@ import { api } from "@/app/service/api"
 import Cookies from "js-cookie"
 
 interface UserData {
+  id: number
   email: string
   name: string
+  role: "ADMIN" | "PEGAWAI" | "DOKTER" | "USER"
 }
 
 interface AuthContextType {

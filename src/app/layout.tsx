@@ -16,6 +16,21 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'Web App for children stats',
   description: 'Web App for managing children data an visualisation of their stats',
+  icons: {
+    icon: '/logo-webapp-fix.png',
+    other: [
+      {
+        rel: 'icon',
+        url: '/logo-webapp-fix.png',
+        sizes: '32x32',
+      },
+      {
+        rel: 'icon',
+        url: '/logo-webapp-fix.png',
+        sizes: '16x16',
+      },
+    ],
+  },
 };
 
 export default function RootLayout({

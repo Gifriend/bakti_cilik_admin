@@ -141,9 +141,9 @@ const AdminRegisterForm: React.FC = () => {
       
       setSuccess('Registrasi admin berhasil! Mengarahkan ke dashboard...');
       
-      // Redirect ke dashboard setelah 2 detik
+      // Redirect ke login setelah 2 detik
       setTimeout(() => {
-        router.push('/admin/dashboard');
+        router.push('/login');
       }, 2000);
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || 'Registrasi gagal. Silakan coba lagi.';

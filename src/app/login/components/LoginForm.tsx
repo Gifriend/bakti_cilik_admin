@@ -42,8 +42,13 @@ const LoginForm: React.FC = () => {
       // Simpan token ke cookie
       setCookie("access_token", response.data.accessToken)
 
-      // Redirect ke dashboard
+      if(response.data.role === "ORANG_TUA") {
+        router.push("/admin")
+      } else if (response.data.role === "DOKTER" || response.data.role === "ADMIN" || response.data.role === "PEGAWAI") {
       router.push("/growth-stats")
+
+      }
+
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || "Login gagal. Silakan coba lagi."
       setError(errorMessage)
