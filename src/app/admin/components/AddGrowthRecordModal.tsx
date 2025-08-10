@@ -16,7 +16,7 @@ interface AddGrowthRecordModalProps {
   onSuccess: () => void
   childId: number
   childName: string
-  childNIK?: string // Tambahkan prop baru
+  childNIK?: string
   adminId?: string
   initialMonth?: number
 }
@@ -98,7 +98,7 @@ export function AddGrowthRecordModal({
         weight: weight,
       }
 
-      // Call the API to add growth record
+      // Call the API to add growth record menggunakan endpoint growth controller
       await growthApi.addGrowthRecord(childId, recordData)
 
       setSuccess("Data pertumbuhan berhasil ditambahkan!")

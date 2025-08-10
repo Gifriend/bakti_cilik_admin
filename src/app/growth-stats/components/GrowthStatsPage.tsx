@@ -128,6 +128,7 @@ export default function GrowthStatsPage() {
         if (chartData.status === "fulfilled") {
           allData[child.id] = chartData.value
           console.log(`✅ Chart data loaded for ${child.name}`)
+          console.log("📈 Chart data:", chartData.value)
         } else {
           console.error(`❌ Chart data failed for ${child.name}:`, chartData.reason)
           allData[child.id] = { records: [], whoCurves: [] }
@@ -194,7 +195,6 @@ export default function GrowthStatsPage() {
         <div className="text-center">
           <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto mb-4" />
           <p className="text-gray-600 font-medium">Memuat data anak...</p>
-          <p className="text-sm text-gray-500 mt-2">Menggunakan endpoint: /users/children</p>
         </div>
       </div>
     )

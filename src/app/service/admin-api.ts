@@ -4,34 +4,12 @@ import { localStorageService } from "./localstorage.service"
 // Updated gender type to use MALE/FEMALE enum
 export type GenderEnum = "MALE" | "FEMALE"
 
-// Updated to match Prisma childCreateInput structure
-export interface CreateChildData {
-  name: string
-  dob: string // Will be converted to Date by backend
-  nik: string
-  gender: GenderEnum // Updated to use MALE/FEMALE enum
-  user: {
-    connect: {
-      id: number // Connect to existing user by ID
-    }
-  }
-}
-
-// Alternative interface for simpler API usage (fallback)
+// Interface untuk menambah anak baru
 export interface CreateChildRequest {
   name: string
   dob: string
   nik: string
-  gender: GenderEnum // Updated to use MALE/FEMALE enum
-  userId: number // Will be transformed to user.connect structure
-}
-
-// Backend expected structure based on error
-export interface CreateChildBackendFormat {
-  name: string
-  dob: string
-  nik: string // Make sure this is explicitly included
-  gender: GenderEnum // Updated to use MALE/FEMALE enum
+  gender: GenderEnum
   userId: number
 }
 
@@ -83,7 +61,7 @@ export interface ApiError {
 }
 
 export const adminApi = {
-  // Add child with localStorage fallback
+  // Add child - menggunakan endpoint admin untuk menambah anak
   addChild: async (childRequest: CreateChildRequest): Promise<CreateChildResponse> => {
     console.log("🚀 Starting addChild request with data:", childRequest)
 
@@ -108,7 +86,7 @@ export const adminApi = {
     }
 
     try {
-      // Try API first
+      // Try API first - menggunakan endpoint admin untuk menambah anak
       const dobDate = new Date(childRequest.dob)
       if (isNaN(dobDate.getTime())) {
         throw new Error("Format tanggal lahir tidak valid")
@@ -116,7 +94,7 @@ export const adminApi = {
 
       const dobISO = dobDate.toISOString()
 
-      const backendChildData: CreateChildBackendFormat = {
+      const childData = {
         name: childRequest.name.trim(),
         dob: dobISO,
         nik: childRequest.nik.trim(),
@@ -124,7 +102,7 @@ export const adminApi = {
         userId: childRequest.userId,
       }
 
-      const response = await api.post<CreateChildResponse>("/admin/add-child", backendChildData)
+      const response = await api.post<CreateChildResponse>("/admin/children", childData)
       console.log("✅ API successful:", response.data)
       return response.data
     } catch (error) {
@@ -164,7 +142,7 @@ export const adminApi = {
     console.log("🚀 Starting getParents request with params:", params)
 
     try {
-      // Try API first
+      // Try API first - menggunakan endpoint admin untuk mendapatkan parents
       const { q, limit = 20 } = params
       const validLimit = Math.min(Math.max(limit, 1), 100)
 
@@ -200,7 +178,7 @@ export const adminApi = {
     }
 
     try {
-      // Try API first
+      // Try API first - menggunakan endpoint admin untuk validasi NIK
       const response = await api.get(`/admin/validate-nik/${nik}`)
       console.log("✅ NIK validation successful:", response.data)
       return response.data
