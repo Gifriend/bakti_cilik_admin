@@ -266,10 +266,10 @@ export default function GrowthStatsPage() {
                     {children.map((child) => (
                       <SelectItem key={child.id} value={child.id.toString()}>
                         <div className="flex items-center gap-2">
-                          <Baby className={`h-4 w-4 ${child.gender === "L" ? "text-blue-500" : "text-pink-500"}`} />
+                          <Baby className={`h-4 w-4 ${child.gender === "MALE" ? "text-blue-500" : "text-pink-500"}`} />
                           <span>{child.name}</span>
                           <span className="text-sm text-gray-500">
-                            ({child.gender === "L" ? "Laki-laki" : "Perempuan"})
+                            ({child.gender === "MALE" ? "Laki-laki" : "Perempuan"})
                           </span>
                         </div>
                       </SelectItem>

@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { TrendingUp, TrendingDown, Minus, BarChart3, Calendar, Ruler, Weight } from "lucide-react"
+import { TrendingUp, TrendingDown, Minus, BarChart3, Calendar, Ruler, Weight, AlertTriangle } from 'lucide-react'
 import type { GrowthStats } from "@/app/service/growth-api"
 
 interface GrowthStatsCardProps {
@@ -57,6 +57,29 @@ export function GrowthStatsCard({ childName, stats, latestRecord }: GrowthStatsC
   }
 
   const heightStatus = getZScoreStatus(latestRecord?.heightZScore)
+
+  // If no data at all, show empty state
+  if (!latestRecord && (!stats || stats._count._all === 0)) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-orange-500" />
+            Belum Ada Data - {childName}
+          </CardTitle>
+          <CardDescription>Belum ada data pengukuran yang tersedia untuk ditampilkan</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8">
+            <div className="text-gray-400 mb-2">
+              <BarChart3 className="h-12 w-12 mx-auto" />
+            </div>
+            <p className="text-gray-500">Data akan muncul setelah pengukuran pertama dilakukan</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

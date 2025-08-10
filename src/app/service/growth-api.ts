@@ -45,7 +45,7 @@ export interface ChildInfo {
   name: string
   dob: string // Date of birth
   nik: string // NIK (Nomor Induk Kependudukan)
-  gender: "L" | "P"
+  gender: "MALE" | "FEMALE" // Updated to match backend enum
 }
 
 export interface CreateGrowthRecordData {

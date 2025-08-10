@@ -2,14 +2,26 @@
 
 import type React from "react"
 import { useState, useEffect, useRef } from "react"
-import { adminApi, type CreateChildData, type Parent } from "@/app/service/admin-api"
+import { adminApi, type CreateChildRequest, type Parent, type GenderEnum } from "@/app/service/admin-api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Loader2, UserPlus, Calendar, User, Baby, Search, AlertCircle, CreditCard } from "lucide-react"
+import {
+  Loader2,
+  UserPlus,
+  Calendar,
+  User,
+  Baby,
+  Search,
+  AlertCircle,
+  CreditCard,
+  CheckCircle,
+  Bug,
+  Info,
+} from "lucide-react"
 
 interface AddChildFormProps {
   onSuccess: () => void
@@ -19,10 +31,16 @@ interface AddChildFormProps {
 
 interface FormData {
   name: string
-  gender: "L" | "P" | ""
+  gender: GenderEnum | "" // Updated to use GenderEnum
   dob: string
-  nik: string // Added NIK field
+  nik: string
   parentId: string
+}
+
+interface NIKValidation {
+  isValidating: boolean
+  isValid: boolean | null
+  message: string
 }
 
 export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps) {
@@ -30,7 +48,7 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
     name: "",
     gender: "",
     dob: "",
-    nik: "", // Added NIK field
+    nik: "",
     parentId: "",
   })
   const [parents, setParents] = useState<Parent[]>([])
@@ -39,13 +57,46 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
   const [loadingParents, setLoadingParents] = useState(true)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
+  const [debugMode, setDebugMode] = useState(false)
+  const [debugInfo, setDebugInfo] = useState<string[]>([])
+  const [nikValidation, setNikValidation] = useState<NIKValidation>({
+    isValidating: false,
+    isValid: null,
+    message: "",
+  })
+
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const nikValidationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Add debug log function
+  const addDebugLog = (message: string) => {
+    const timestamp = new Date().toLocaleTimeString()
+    const logMessage = `[${timestamp}] ${message}`
+    console.log(logMessage)
+    setDebugInfo((prev) => [...prev.slice(-4), logMessage]) // Keep last 5 logs
+  }
+
+  // Test API connection on mount
+  useEffect(() => {
+    const testConnection = async () => {
+      try {
+        addDebugLog("Testing API connection...")
+        await adminApi.testConnection()
+        addDebugLog("✅ API connection successful")
+      } catch (error) {
+        addDebugLog(`❌ API connection failed: ${error instanceof Error ? error.message : "Unknown error"}`)
+      }
+    }
+
+    testConnection()
+  }, [])
 
   // Load parents with optional search query
   const loadParents = async (searchQuery = "") => {
     try {
       setLoadingParents(true)
       setError("") // Clear any previous errors
+      addDebugLog(`Loading parents with query: "${searchQuery}"`)
 
       const parentsData = await adminApi.getParents({
         q: searchQuery,
@@ -53,9 +104,11 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
       })
 
       setParents(parentsData)
+      addDebugLog(`✅ Loaded ${parentsData.length} parents`)
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Gagal memuat data orang tua"
       console.error("Error loading parents:", error)
+      addDebugLog(`❌ Failed to load parents: ${errorMessage}`)
       setError(errorMessage)
       setParents([]) // Clear parents on error
     } finally {
@@ -66,6 +119,7 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
   // Handle search with debouncing
   const handleSearchChange = (value: string) => {
     setParentSearch(value)
+    addDebugLog(`Search changed to: "${value}"`)
 
     // Clear selected parent if search changes
     if (formData.parentId) {
@@ -82,61 +136,210 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
     }, 300) // 300ms debounce
   }
 
+  // Validate NIK with debouncing
+  const validateNIK = async (nik: string) => {
+    if (!nik || nik.length !== 16) {
+      setNikValidation({
+        isValidating: false,
+        isValid: false,
+        message: "NIK harus berupa 16 digit angka",
+      })
+      return
+    }
+
+    // Client-side format validation
+    if (!/^\d{16}$/.test(nik)) {
+      setNikValidation({
+        isValidating: false,
+        isValid: false,
+        message: "NIK harus berupa angka saja",
+      })
+      return
+    }
+
+    setNikValidation({
+      isValidating: true,
+      isValid: null,
+      message: "Memvalidasi NIK...",
+    })
+
+    addDebugLog(`Validating NIK: ${nik}`)
+
+    try {
+      const result = await adminApi.validateNIK(nik)
+      setNikValidation({
+        isValidating: false,
+        isValid: result.available,
+        message: result.available ? "NIK tersedia" : result.message,
+      })
+      addDebugLog(`NIK validation result: ${result.available ? "Available" : "Not available"} - ${result.message}`)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Gagal memvalidasi NIK"
+      addDebugLog(`❌ NIK validation failed: ${errorMessage}`)
+      setNikValidation({
+        isValidating: false,
+        isValid: true, // Assume available if validation fails
+        message: "Tidak dapat memvalidasi NIK, diasumsikan tersedia",
+      })
+    }
+  }
+
+  // Handle NIK change with validation
+  const handleNIKChange = (value: string) => {
+    // Only allow numbers and limit to 16 characters
+    const cleanValue = value.replace(/\D/g, "").slice(0, 16)
+    handleInputChange("nik", cleanValue)
+
+    addDebugLog(`NIK changed to: ${cleanValue} (length: ${cleanValue.length})`)
+
+    // Clear previous validation timeout
+    if (nikValidationTimeoutRef.current) {
+      clearTimeout(nikValidationTimeoutRef.current)
+    }
+
+    // Reset validation state
+    setNikValidation({
+      isValidating: false,
+      isValid: null,
+      message: "",
+    })
+
+    // Validate NIK after user stops typing
+    if (cleanValue.length === 16) {
+      nikValidationTimeoutRef.current = setTimeout(() => {
+        validateNIK(cleanValue)
+      }, 500) // 500ms debounce for NIK validation
+    } else if (cleanValue.length > 0) {
+      setNikValidation({
+        isValidating: false,
+        isValid: false,
+        message: `NIK harus 16 digit (saat ini: ${cleanValue.length} digit)`,
+      })
+    }
+  }
+
   // Load initial data on component mount
   useEffect(() => {
     loadParents() // Load initial data without search query
 
-    // Cleanup timeout on unmount
+    // Cleanup timeouts on unmount
     return () => {
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current)
+      }
+      if (nikValidationTimeoutRef.current) {
+        clearTimeout(nikValidationTimeoutRef.current)
       }
     }
   }, [])
 
   // NIK validation function
-  const validateNIK = (nik: string): boolean => {
-    // NIK should be exactly 16 digits
+  const isNIKFormatValid = (nik: string): boolean => {
     const nikRegex = /^\d{16}$/
     return nikRegex.test(nik)
   }
 
+  // Update the handleSubmit function to include date validation and logging
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError("")
     setSuccess("")
     setLoading(true)
 
+    addDebugLog("🚀 Starting form submission...")
+
     try {
-      // Validate form data
+      // Enhanced validation with detailed logging
       if (!formData.name.trim()) {
+        addDebugLog("❌ Validation failed: Name is empty")
         throw new Error("Nama anak harus diisi")
       }
+      addDebugLog(`✅ Name validation passed: "${formData.name.trim()}"`)
+
       if (!formData.gender) {
+        addDebugLog("❌ Validation failed: Gender not selected")
         throw new Error("Jenis kelamin harus dipilih")
       }
+      addDebugLog(`✅ Gender validation passed: "${formData.gender}"`)
+
       if (!formData.dob) {
+        addDebugLog("❌ Validation failed: DOB is empty")
         throw new Error("Tanggal lahir harus diisi")
       }
-      if (!formData.nik.trim()) {
-        throw new Error("NIK harus diisi")
-      }
-      if (!validateNIK(formData.nik.trim())) {
-        throw new Error("NIK harus berupa 16 digit angka")
-      }
-      if (!formData.parentId) {
-        throw new Error("Orang tua harus dipilih")
+
+      // Validate date format and value
+      const dobDate = new Date(formData.dob)
+      if (isNaN(dobDate.getTime())) {
+        addDebugLog(`❌ Validation failed: DOB is invalid date - "${formData.dob}"`)
+        throw new Error("Format tanggal lahir tidak valid")
       }
 
-      const childData: CreateChildData = {
+      // Check if date is not in the future
+      const today = new Date()
+      if (dobDate > today) {
+        addDebugLog(`❌ Validation failed: DOB is in the future - "${formData.dob}"`)
+        throw new Error("Tanggal lahir tidak boleh di masa depan")
+      }
+
+      // Check if date is reasonable (not too old)
+      const hundredYearsAgo = new Date()
+      hundredYearsAgo.setFullYear(hundredYearsAgo.getFullYear() - 100)
+      if (dobDate < hundredYearsAgo) {
+        addDebugLog(`❌ Validation failed: DOB is too old - "${formData.dob}"`)
+        throw new Error("Tanggal lahir tidak valid (terlalu lama)")
+      }
+
+      addDebugLog(`✅ DOB validation passed: "${formData.dob}" -> ${dobDate.toISOString()}`)
+
+      if (!formData.nik.trim()) {
+        addDebugLog("❌ Validation failed: NIK is empty")
+        throw new Error("NIK harus diisi")
+      }
+      addDebugLog(`✅ NIK presence validation passed: "${formData.nik.trim()}"`)
+
+      if (!isNIKFormatValid(formData.nik.trim())) {
+        addDebugLog(`❌ Validation failed: NIK format invalid (length: ${formData.nik.trim().length})`)
+        throw new Error("NIK harus berupa 16 digit angka")
+      }
+      addDebugLog(`✅ NIK format validation passed: "${formData.nik.trim()}" (16 digits)`)
+
+      if (nikValidation.isValid === false) {
+        addDebugLog(`❌ Validation failed: NIK not available - ${nikValidation.message}`)
+        throw new Error(nikValidation.message || "NIK tidak valid")
+      }
+      addDebugLog(`✅ NIK availability validation passed`)
+
+      if (!formData.parentId) {
+        addDebugLog("❌ Validation failed: Parent not selected")
+        throw new Error("Orang tua harus dipilih")
+      }
+      addDebugLog(`✅ Parent validation passed: ID ${formData.parentId}`)
+
+      addDebugLog("✅ All form validations passed")
+
+      // Create child request with explicit field validation
+      const childRequest: CreateChildRequest = {
         name: formData.name.trim(),
-        dob: formData.dob,
-        nik: formData.nik.trim(), // Added NIK
-        gender: formData.gender as "L" | "P",
+        dob: formData.dob, // Keep as date string, API will convert to ISO
+        nik: formData.nik.trim(),
+        gender: formData.gender as GenderEnum, // Cast to GenderEnum
         userId: Number.parseInt(formData.parentId),
       }
 
-      const response = await adminApi.addChild(childData)
+      // Log the exact data being sent
+      addDebugLog(`📤 Submitting child data:`)
+      addDebugLog(`  - name: "${childRequest.name}" (type: ${typeof childRequest.name})`)
+      addDebugLog(`  - dob: "${childRequest.dob}" (type: ${typeof childRequest.dob})`)
+      addDebugLog(`  - dob as Date: ${new Date(childRequest.dob).toISOString()}`)
+      addDebugLog(
+        `  - nik: "${childRequest.nik}" (type: ${typeof childRequest.nik}, length: ${childRequest.nik.length})`,
+      )
+      addDebugLog(`  - gender: "${childRequest.gender}" (type: ${typeof childRequest.gender})`)
+      addDebugLog(`  - userId: ${childRequest.userId} (type: ${typeof childRequest.userId})`)
+
+      const response = await adminApi.addChild(childRequest)
+
+      addDebugLog("✅ Child added successfully")
       setSuccess("Data anak berhasil ditambahkan!")
 
       // Reset form
@@ -144,16 +347,22 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
         name: "",
         gender: "",
         dob: "",
-        nik: "", // Reset NIK
+        nik: "",
         parentId: "",
       })
       setParentSearch("")
+      setNikValidation({
+        isValidating: false,
+        isValid: null,
+        message: "",
+      })
 
       setTimeout(() => {
         onSuccess()
       }, 1500)
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Gagal menambahkan data anak"
+      addDebugLog(`❌ Form submission failed: ${errorMessage}`)
       setError(errorMessage)
     } finally {
       setLoading(false)
@@ -166,6 +375,46 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
 
   const selectedParent = parents.find((parent) => parent.id.toString() === formData.parentId)
 
+  // Check if form is valid for submission
+  const isFormValid = () => {
+    const valid =
+      formData.name.trim() &&
+      formData.gender &&
+      formData.dob &&
+      formData.nik.trim() &&
+      isNIKFormatValid(formData.nik.trim()) &&
+      (nikValidation.isValid === true || nikValidation.isValid === null) && // Allow null for when validation endpoint is not available
+      formData.parentId &&
+      !loadingParents &&
+      !nikValidation.isValidating
+
+    if (debugMode) {
+      addDebugLog(`Form validity check: ${valid ? "VALID" : "INVALID"}`)
+      addDebugLog(`  - name: ${!!formData.name.trim()}`)
+      addDebugLog(`  - gender: ${!!formData.gender}`)
+      addDebugLog(`  - dob: ${!!formData.dob}`)
+      addDebugLog(`  - nik: ${!!formData.nik.trim()} (format: ${isNIKFormatValid(formData.nik.trim())})`)
+      addDebugLog(`  - nikValidation: ${nikValidation.isValid}`)
+      addDebugLog(`  - parentId: ${!!formData.parentId}`)
+      addDebugLog(`  - loadingParents: ${loadingParents}`)
+      addDebugLog(`  - nikValidating: ${nikValidation.isValidating}`)
+    }
+
+    return valid
+  }
+
+  // Helper function to get gender display text
+  const getGenderDisplayText = (gender: GenderEnum | ""): string => {
+    switch (gender) {
+      case "MALE":
+        return "Laki-laki"
+      case "FEMALE":
+        return "Perempuan"
+      default:
+        return ""
+    }
+  }
+
   return (
     <Dialog open={true} onOpenChange={onCancel}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -175,19 +424,74 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
               <UserPlus className="h-4 w-4 text-green-600" />
             </div>
             Tambah Data Anak Baru
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setDebugMode(!debugMode)}
+              className="ml-auto"
+            >
+              <Bug className="h-4 w-4" />
+            </Button>
           </DialogTitle>
         </DialogHeader>
+
+        {/* Debug Panel */}
+        {debugMode && (
+          <div className="mb-4 p-3 bg-gray-100 rounded-lg text-xs font-mono">
+            <div className="font-semibold mb-2 flex items-center gap-2">
+              <Info className="h-4 w-4" />
+              Debug Log:
+            </div>
+            <div className="max-h-32 overflow-y-auto space-y-1">
+              {debugInfo.map((log, index) => (
+                <div key={index} className="text-gray-700">
+                  {log}
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 pt-2 border-t border-gray-300">
+              <div className="text-xs text-gray-600">
+                <strong>Current Form State:</strong>
+              </div>
+              <div className="text-xs text-gray-600">
+                Name: "{formData.name}" | Gender: "{formData.gender}" | DOB: "{formData.dob}" | NIK: "{formData.nik}" (
+                {formData.nik.length}/16) | Parent: "{formData.parentId}"
+              </div>
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {error && (
             <Alert variant="destructive" className="border-red-200 bg-red-50">
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription className="text-red-700">{error}</AlertDescription>
+              <AlertDescription className="text-red-700">
+                <div>{error}</div>
+                {debugMode && (
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-xs">Debug Details</summary>
+                    <pre className="mt-1 text-xs bg-red-100 p-2 rounded overflow-auto">
+                      {JSON.stringify(
+                        {
+                          formData,
+                          nikValidation,
+                          parentsCount: parents.length,
+                          isFormValid: isFormValid(),
+                        },
+                        null,
+                        2,
+                      )}
+                    </pre>
+                  </details>
+                )}
+              </AlertDescription>
             </Alert>
           )}
 
           {success && (
             <Alert className="border-green-200 bg-green-50">
+              <CheckCircle className="h-4 w-4" />
               <AlertDescription className="text-green-700">{success}</AlertDescription>
             </Alert>
           )}
@@ -223,7 +527,9 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-gray-700">Pilih dari daftar:</Label>
+                  <Label className="text-sm font-medium text-gray-700">
+                    Pilih dari daftar: ({parents.length} orang tua ditemukan)
+                  </Label>
                   <div className="max-h-40 overflow-y-auto border rounded-lg">
                     {parents.length === 0 ? (
                       <div className="p-4 text-center text-gray-500 text-sm">
@@ -295,15 +601,15 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
                 </Label>
                 <Select
                   value={formData.gender}
-                  onValueChange={(value) => handleInputChange("gender", value)}
+                  onValueChange={(value) => handleInputChange("gender", value as GenderEnum)}
                   disabled={loading}
                 >
                   <SelectTrigger className="h-11">
                     <SelectValue placeholder="Pilih jenis kelamin" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="L">Laki-laki</SelectItem>
-                    <SelectItem value="P">Perempuan</SelectItem>
+                    <SelectItem value="MALE">Laki-laki</SelectItem>
+                    <SelectItem value="FEMALE">Perempuan</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -319,18 +625,44 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
                     type="text"
                     placeholder="Masukkan 16 digit NIK"
                     value={formData.nik}
-                    onChange={(e) => {
-                      // Only allow numbers and limit to 16 characters
-                      const value = e.target.value.replace(/\D/g, "").slice(0, 16)
-                      handleInputChange("nik", value)
-                    }}
+                    onChange={(e) => handleNIKChange(e.target.value)}
                     required
                     disabled={loading}
-                    className="h-11 pl-10"
+                    className={`h-11 pl-10 pr-10 ${
+                      nikValidation.isValid === true
+                        ? "border-green-500 focus:border-green-500"
+                        : nikValidation.isValid === false
+                          ? "border-red-500 focus:border-red-500"
+                          : ""
+                    }`}
                     maxLength={16}
                   />
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    {nikValidation.isValidating ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                    ) : nikValidation.isValid === true ? (
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                    ) : nikValidation.isValid === false ? (
+                      <AlertCircle className="h-4 w-4 text-red-500" />
+                    ) : null}
+                  </div>
                 </div>
-                <p className="text-xs text-gray-500">NIK harus berupa 16 digit angka</p>
+                <div className="flex items-center gap-2 text-xs">
+                  {nikValidation.message && (
+                    <span
+                      className={
+                        nikValidation.isValid === true
+                          ? "text-green-600"
+                          : nikValidation.isValid === false
+                            ? "text-red-600"
+                            : "text-gray-500"
+                      }
+                    >
+                      {nikValidation.message}
+                    </span>
+                  )}
+                  {!nikValidation.message && <span className="text-gray-500">NIK harus berupa 16 digit angka</span>}
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -367,16 +699,7 @@ export function AddChildForm({ onSuccess, onCancel, adminId }: AddChildFormProps
             </Button>
             <Button
               type="submit"
-              disabled={
-                loading ||
-                !formData.name.trim() ||
-                !formData.gender ||
-                !formData.dob ||
-                !formData.nik.trim() ||
-                !validateNIK(formData.nik.trim()) ||
-                !formData.parentId ||
-                loadingParents
-              }
+              disabled={loading || !isFormValid()}
               className="flex-1 h-11 bg-green-600 hover:bg-green-700"
             >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

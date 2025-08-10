@@ -16,7 +16,7 @@ interface Child {
   id: number
   name: string
   birthDate: string
-  gender: "L" | "P"
+  gender: "MALE" | "FEMALE"
   parentName: string
   parentEmail: string
   recordsCount: number
@@ -246,17 +246,17 @@ export default function AdminPage() {
                             <div className="flex items-center gap-4">
                               <div
                                 className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                                  child.gender === "L" ? "bg-blue-100" : "bg-pink-100"
+                                  child.gender === "MALE" ? "bg-blue-100" : "bg-pink-100"
                                 }`}
                               >
                                 <Baby
-                                  className={`h-6 w-6 ${child.gender === "L" ? "text-blue-600" : "text-pink-600"}`}
+                                  className={`h-6 w-6 ${child.gender === "MALE" ? "text-blue-600" : "text-pink-600"}`}
                                 />
                               </div>
                               <div>
                                 <h3 className="font-semibold text-lg">{child.name}</h3>
                                 <p className="text-gray-600">
-                                  {child.gender === "L" ? "Laki-laki" : "Perempuan"} • {calculateAge(child.dob)} bulan
+                                  {child.gender === "MALE" ? "Laki-laki" : "Perempuan"} • {calculateAge(child.dob)} bulan
                                 </p>
                                 <p className="text-sm text-gray-500">
                                   Orang Tua: {child.parentName} ({child.parentEmail})
