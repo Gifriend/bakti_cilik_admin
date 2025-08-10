@@ -196,7 +196,7 @@ const LoginForm: React.FC = () => {
               </div>
 
               {/* Forgot Password Link - Mobile friendly */}
-              <div className="text-right">
+              {/* <div className="text-right">
                 <button
                   type="button"
                   className="text-sm text-blue-600 hover:text-blue-700 font-medium hover:underline"
@@ -204,7 +204,7 @@ const LoginForm: React.FC = () => {
                 >
                   Lupa Password?
                 </button>
-              </div>
+              </div> */}
 
               {/* Login Button - Mobile optimized */}
               <Button
