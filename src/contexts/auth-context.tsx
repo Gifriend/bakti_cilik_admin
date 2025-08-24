@@ -33,7 +33,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string): Promise<void> => {
     try {
-      const res = await api.post("/auth/register", { email, password })
+      // ✅ ubah register → login
+      const res = await api.post("/auth/login", { email, password })
       const { access_token, user } = res.data
 
       // simpan token di cookie
@@ -42,7 +43,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // simpan user di state
       setUser(user)
     } catch (error) {
-      console.error("Registrasi gagal:", error)
+      console.error("Login gagal:", error)
       throw error
     }
   }
@@ -57,7 +58,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const token = Cookies.get("access_token")
         if (token) {
-          const res = await api.get("/auth/me") // endpoint cek user 
+          const res = await api.get("/auth/me") // backend return payload user
           setUser(res.data)
         }
       } catch (error) {
