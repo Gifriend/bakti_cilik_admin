@@ -27,7 +27,6 @@ import {
   Users,
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { UserMenu } from '@/components/UserMenu';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -39,6 +38,8 @@ import {
 import { Label } from '@/components/ui/label';
 import { PWAStatus } from '@/components/PWAStatus';
 import { getCookieValue } from '@/app/service/api';
+import { Skeleton } from '@/components/ui/skeleton';
+import { UserMenu } from '@/components/UserMenu';
 
 // Define local storage keys
 const LOCAL_STORAGE_KEYS = {
@@ -46,6 +47,70 @@ const LOCAL_STORAGE_KEYS = {
   CHART_DATA: 'growthTracker_chartData_',
   STATS_DATA: 'growthTracker_statsData_',
 };
+
+// Skeleton Components
+const GrowthStatsSkeleton = () => (
+  <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+    <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-t-lg p-6">
+      <Skeleton className="h-6 w-48 bg-blue-400" />
+      <Skeleton className="h-4 w-64 bg-blue-300 mt-2" />
+    </CardHeader>
+    <CardContent className="p-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="space-y-2 p-4 bg-gray-50 rounded-lg">
+            <Skeleton className="h-4 w-24 bg-gray-300" />
+            <Skeleton className="h-8 w-20 bg-gray-400" />
+            <Skeleton className="h-3 w-32 bg-gray-300" />
+          </div>
+        ))}
+      </div>
+    </CardContent>
+  </Card>
+);
+
+const GrowthChartSkeleton = () => (
+  <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+    <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-t-lg p-6">
+      <Skeleton className="h-6 w-56 bg-blue-400" />
+      <Skeleton className="h-4 w-72 bg-blue-300 mt-2" />
+    </CardHeader>
+    <CardContent className="p-6">
+      <div className="mb-6">
+        <div className="flex space-x-2 mb-4">
+          <Skeleton className="h-10 w-32 bg-gray-300 rounded-md" />
+          <Skeleton className="h-10 w-32 bg-gray-300 rounded-md" />
+        </div>
+        <Skeleton className="h-64 w-full bg-gray-200 rounded-lg" />
+      </div>
+    </CardContent>
+  </Card>
+);
+
+const ChildCardSkeleton = () => (
+  <Card className="bg-gradient-to-br from-gray-50 to-white border border-gray-200">
+    <CardContent className="p-4">
+      <div className="flex items-center gap-3 mb-3">
+        <Skeleton className="h-5 w-5 rounded-full bg-gray-300" />
+        <div>
+          <Skeleton className="h-4 w-32 bg-gray-400 mb-1" />
+          <Skeleton className="h-3 w-24 bg-gray-300" />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          {[...Array(2)].map((_, i) => (
+            <div key={i} className="p-2 rounded bg-gray-100">
+              <Skeleton className="h-3 w-16 bg-gray-400 mb-1" />
+              <Skeleton className="h-5 w-12 bg-gray-500" />
+            </div>
+          ))}
+        </div>
+        <Skeleton className="h-3 w-40 bg-gray-300" />
+      </div>
+    </CardContent>
+  </Card>
+);
 
 export default function GrowthStatsPage() {
   const [children, setChildren] = useState<ChildInfo[]>([]);
@@ -57,10 +122,11 @@ export default function GrowthStatsPage() {
     [childId: number]: GrowthStats;
   }>({});
   const [loading, setLoading] = useState(true);
-  const [loadingData, setLoadingData] = useState(false);
+  const [loadingData, setLoadingData] = useState<number | 'all' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [noChildFound, setNoChildFound] = useState(false);
   const [accessDenied, setAccessDenied] = useState(false);
+  const [loadedChildren, setLoadedChildren] = useState<number[]>([]);
 
   // Load data from local storage
   const loadFromLocalStorage = <T,>(key: string): T | null => {
@@ -122,7 +188,11 @@ export default function GrowthStatsPage() {
         console.log('✅ Using children data from local storage');
         setChildren(storedChildren);
         setSelectedView('all');
-        await loadAllChildrenData(storedChildren);
+
+        // Load data for the first child only initially for better performance
+        if (storedChildren.length > 0) {
+          await loadChildData(storedChildren[0].id);
+        }
 
         // Continue to fetch fresh data in the background
         fetchFreshChildrenData();
@@ -153,23 +223,133 @@ export default function GrowthStatsPage() {
     }
   };
 
+  // Load data for a specific child
+  const loadChildData = async (childId: number) => {
+    // Skip if already loaded
+    if (loadedChildren.includes(childId)) return;
+
+    setLoadingData(childId);
+
+    try {
+      console.log(`📊 Loading data for child ID: ${childId}`);
+
+      // Default GrowthStats object to use as fallback
+      const defaultGrowthStats: GrowthStats = {
+        _count: { _all: 0 },
+        _avg: { height: 0, weight: 0, heightZScore: 0 },
+        _min: {
+          date: '',
+          height: 0,
+          weight: 0,
+          heightZScore: 0,
+        },
+        _max: {
+          date: '',
+          height: 0,
+          weight: 0,
+          heightZScore: 0,
+        },
+      };
+
+      // Try to load from local storage first
+      const storedChartData = loadFromLocalStorage<GrowthChartData>(
+        `${LOCAL_STORAGE_KEYS.CHART_DATA}${childId}`
+      );
+      const storedStatsData = loadFromLocalStorage<GrowthStats>(
+        `${LOCAL_STORAGE_KEYS.STATS_DATA}${childId}`
+      );
+
+      if (storedChartData && storedStatsData) {
+        console.log(`✅ Using stored data for child ${childId}`);
+        setAllChildrenData((prev) => ({ ...prev, [childId]: storedChartData }));
+        setAllChildrenStats((prev) => ({
+          ...prev,
+          [childId]: storedStatsData,
+        }));
+        setLoadedChildren((prev) => [...prev, childId]);
+
+        // Fetch fresh data in the background
+        fetchFreshChildData(childId);
+        return;
+      }
+
+      // If no data in local storage, fetch from API
+      await fetchFreshChildData(childId);
+    } catch (error) {
+      console.error(`❌ Error loading data for child ${childId}:`, error);
+    } finally {
+      setLoadingData(null);
+    }
+  };
+
+  // Load data for all children (lazy loading)
+  const loadAllChildrenData = async (childrenList: ChildInfo[]) => {
+    setLoadingData('all');
+
+    try {
+      console.log('🚀 Loading data for all children...');
+
+      // Load data for each child sequentially to avoid overloading
+      for (const child of childrenList) {
+        if (!loadedChildren.includes(child.id)) {
+          await loadChildData(child.id);
+        }
+      }
+
+      console.log('✅ All children data loaded');
+    } catch (error) {
+      console.error('❌ Error loading all children data:', error);
+    } finally {
+      setLoadingData(null);
+    }
+  };
+
+  // Fetch fresh child data from API
+  const fetchFreshChildData = async (childId: number) => {
+    try {
+      const [chartData, statsData] = await Promise.all([
+        growthApi.getGrowthChart(childId),
+        growthApi.getGrowthStats(childId),
+      ]);
+
+      // Store the fetched data
+      setAllChildrenData((prev) => ({ ...prev, [childId]: chartData }));
+      setAllChildrenStats((prev) => ({ ...prev, [childId]: statsData }));
+      setLoadedChildren((prev) => [...prev, childId]);
+
+      // Save to local storage for offline use
+      saveToLocalStorage(
+        `${LOCAL_STORAGE_KEYS.CHART_DATA}${childId}`,
+        chartData
+      );
+      saveToLocalStorage(
+        `${LOCAL_STORAGE_KEYS.STATS_DATA}${childId}`,
+        statsData
+      );
+
+      console.log(`✅ Fresh data loaded for child ${childId}`);
+    } catch (error) {
+      console.error(
+        `❌ Error fetching fresh data for child ${childId}:`,
+        error
+      );
+      throw error;
+    }
+  };
+
   // Fetch fresh children data from API
   const fetchFreshChildrenData = async () => {
     try {
       const childrenResponse = await growthApi.getMyChildrenUsers();
       console.log('🔍 Raw children response:', childrenResponse);
-      console.log('🔍 Response type:', typeof childrenResponse);
-      console.log('🔍 Is array:', Array.isArray(childrenResponse));
 
       // Handle different response formats
       let childrenData: ChildInfo[] = [];
 
       if (Array.isArray(childrenResponse)) {
-        // Direct array response
         childrenData = childrenResponse;
         console.log('✅ Using direct array response');
       } else if (childrenResponse && typeof childrenResponse === 'object') {
-        // Check if it's wrapped in a data property
         if ('data' in childrenResponse && Array.isArray(childrenResponse)) {
           childrenData = childrenResponse;
           console.log('✅ Using response.data array');
@@ -186,13 +366,11 @@ export default function GrowthStatsPage() {
       }
 
       console.log('✅ Processed children data:', childrenData);
-      console.log('✅ Children count:', childrenData.length);
 
       if (childrenData.length === 0) {
         console.log('ℹ️ No children found for user');
         setNoChildFound(true);
         setChildren([]);
-        // Clear any stale data from local storage
         clearLocalStorageData(LOCAL_STORAGE_KEYS.CHILDREN);
       } else {
         console.log(
@@ -205,98 +383,32 @@ export default function GrowthStatsPage() {
         // Save to local storage
         saveToLocalStorage(LOCAL_STORAGE_KEYS.CHILDREN, childrenData);
 
-        // Load data for all children
-        await loadAllChildrenData(childrenData);
+        // Load data for the first child only initially
+        if (childrenData.length > 0) {
+          await loadChildData(childrenData[0].id);
+        }
       }
     } catch (error) {
       console.error('❌ Error fetching fresh children data:', error);
-      throw error; // Re-throw to be handled by the calling function
+      throw error;
     }
-  };
-
-  // Load data for all children
-  const loadAllChildrenData = async (childrenList: ChildInfo[]) => {
-    setLoadingData(true);
-    const allData: { [childId: number]: GrowthChartData } = {};
-    const allStats: { [childId: number]: GrowthStats } = {};
-
-    console.log('🚀 Loading data for all children...');
-
-    // Default GrowthStats object to use as fallback
-    const defaultGrowthStats: GrowthStats = {
-      _count: { _all: 0 },
-      _avg: { height: 0, weight: 0, heightZScore: 0 },
-      _min: {
-        date: '',
-        height: 0,
-        weight: 0,
-        heightZScore: 0,
-      },
-      _max: {
-        date: '',
-        height: 0,
-        weight: 0,
-        heightZScore: 0,
-      },
-    };
-
-    for (const child of childrenList) {
-      try {
-        console.log(`📊 Loading data for ${child.name} (ID: ${child.id})`);
-
-        // Always fetch fresh data from API
-        const [chartData, statsData] = await Promise.all([
-          growthApi.getGrowthChart(child.id),
-          growthApi.getGrowthStats(child.id),
-        ]);
-
-        // Store the fetched data
-        allData[child.id] = chartData;
-        allStats[child.id] = statsData;
-
-        // Save to local storage for offline use
-        saveToLocalStorage(
-          `${LOCAL_STORAGE_KEYS.CHART_DATA}${child.id}`,
-          chartData
-        );
-        saveToLocalStorage(
-          `${LOCAL_STORAGE_KEYS.STATS_DATA}${child.id}`,
-          statsData
-        );
-
-        console.log(`✅ Chart and stats data loaded for ${child.name}`);
-      } catch (error) {
-        console.error(`❌ Error loading data for child ${child.id}:`, error);
-
-        // Fallback to local storage if API call fails
-        const storedChartData = loadFromLocalStorage<GrowthChartData>(
-          `${LOCAL_STORAGE_KEYS.CHART_DATA}${child.id}`
-        );
-        const storedStatsData = loadFromLocalStorage<GrowthStats>(
-          `${LOCAL_STORAGE_KEYS.STATS_DATA}${child.id}`
-        );
-
-        allData[child.id] = storedChartData || { records: [], whoCurves: [] };
-        allStats[child.id] = storedStatsData || defaultGrowthStats;
-
-        console.log(
-          storedChartData || storedStatsData
-            ? `✅ Fallback to local storage for ${child.name}`
-            : `⚠️ Using default data for ${child.name}`
-        );
-      }
-    }
-
-    setAllChildrenData(allData);
-    setAllChildrenStats(allStats);
-    setLoadingData(false);
-    console.log('✅ All children data loaded');
   };
 
   // Handle view selection change
-  const handleViewChange = (value: string) => {
+  const handleViewChange = async (value: string) => {
     const newView = value === 'all' ? 'all' : Number.parseInt(value);
     console.log('🎯 View changed to:', newView);
+
+    // If switching to all view, load data for all children
+    if (newView === 'all') {
+      setLoadingData('all');
+      setTimeout(() => loadAllChildrenData(children), 100); // Small delay for smoother UX
+    }
+    // If switching to a specific child, load data for that child if not already loaded
+    else if (typeof newView === 'number' && !loadedChildren.includes(newView)) {
+      await loadChildData(newView);
+    }
+
     setSelectedView(newView);
   };
 
@@ -312,6 +424,7 @@ export default function GrowthStatsPage() {
       clearLocalStorageData(`${LOCAL_STORAGE_KEYS.CHART_DATA}${child.id}`);
       clearLocalStorageData(`${LOCAL_STORAGE_KEYS.STATS_DATA}${child.id}`);
     });
+    setLoadedChildren([]);
     loadChildren();
   };
 
@@ -337,15 +450,82 @@ export default function GrowthStatsPage() {
 
   // Show loading on initial load
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600 font-medium">Memuat data anak...</p>
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+      {/* Header Skeleton */}
+      <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-40">
+        <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <Skeleton className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gray-300" />
+              <div>
+                <Skeleton className="h-6 w-40 bg-gray-400 mb-1" />
+                <Skeleton className="h-4 w-32 bg-gray-300" />
+              </div>
+            </div>
+            <Skeleton className="h-10 w-10 rounded-full bg-gray-300" />
+          </div>
         </div>
       </div>
-    );
-  }
+
+      <div className="container mx-auto p-4 sm:p-6 space-y-6 sm:space-y-8">
+        {/* View Selection Skeleton */}
+        <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+          <CardHeader>
+            <Skeleton className="h-5 w-40 bg-gray-400 mb-2" />
+            <Skeleton className="h-4 w-60 bg-gray-300" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-32 bg-gray-300" />
+              <Skeleton className="h-10 w-full max-w-md bg-gray-200" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Stats Cards Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          {[...Array(3)].map((_, i) => (
+            <Card key={i} className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+              <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-t-lg p-4 sm:p-6">
+                <Skeleton className="h-6 w-32 bg-blue-400" />
+                <Skeleton className="h-4 w-40 bg-blue-300 mt-2" />
+              </CardHeader>
+              <CardContent className="p-4 sm:p-6">
+                <div className="grid grid-cols-3 gap-4">
+                  {[...Array(3)].map((_, j) => (
+                    <div key={j} className="space-y-2 p-3 bg-gray-50 rounded-lg">
+                      <Skeleton className="h-4 w-16 bg-gray-300" />
+                      <Skeleton className="h-6 w-12 bg-gray-400" />
+                      <Skeleton className="h-3 w-20 bg-gray-300" />
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Chart Skeleton */}
+        <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+          <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-t-lg p-4 sm:p-6">
+            <Skeleton className="h-6 w-48 bg-blue-400" />
+            <Skeleton className="h-4 w-56 bg-blue-300 mt-2" />
+          </CardHeader>
+          <CardContent className="p-4 sm:p-6">
+            <div className="mb-4 sm:mb-6">
+              <div className="flex space-x-2 mb-4">
+                <Skeleton className="h-10 w-32 bg-gray-300 rounded-md" />
+                <Skeleton className="h-10 w-32 bg-gray-300 rounded-md" />
+              </div>
+              <Skeleton className="h-64 w-full bg-gray-200 rounded-lg" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
@@ -492,248 +672,291 @@ export default function GrowthStatsPage() {
         {/* Main Content */}
         {children.length > 0 && (
           <div className="space-y-8">
-            {loadingData ? (
+            {/* Show loading indicator when data is being loaded */}
+            {loadingData && (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-blue-600 mr-3" />
                 <span className="text-gray-600">
-                  Memuat data pertumbuhan...
+                  {loadingData === 'all'
+                    ? 'Memuat data semua anak...'
+                    : `Memuat data untuk ${children.find((c) => c.id === loadingData)?.name}...`}
                 </span>
               </div>
-            ) : (
-              <div>
-                {/* All Children View */}
-                {selectedView === 'all' && (
-                  <div className="space-y-8">
-                    {/* Overview Stats for All Children */}
-                    <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
-                      <CardHeader className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-t-lg p-4 sm:p-6">
-                        <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-                          <Users className="h-4 w-4 sm:h-5 sm:w-5" />
-                          <span>Ringkasan Semua Anak ({children.length})</span>
-                        </CardTitle>
-                        <CardDescription className="text-purple-100 text-sm sm:text-base">
-                          Data pertumbuhan untuk semua anak yang terdaftar
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="p-4 sm:p-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            )}
+
+            {/* All Children View */}
+            {selectedView === 'all' && (
+              <div className="space-y-8">
+                {/* Overview Stats for All Children */}
+                <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+                  <CardHeader className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-t-lg p-4 sm:p-6">
+                    <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                      <Users className="h-4 w-4 sm:h-5 sm:w-5" />
+                      <span>Ringkasan Semua Anak ({children.length})</span>
+                    </CardTitle>
+                    <CardDescription className="text-purple-100 text-sm sm:text-base">
+                      Data pertumbuhan untuk semua anak yang terdaftar
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-4 sm:p-6">
+                    {loadingData === 'all' ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {children.map((child) => (
+                          <ChildCardSkeleton key={child.id} />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {children.map((child) => {
+                          const childData = allChildrenData[child.id];
+                          const childStats = allChildrenStats[child.id];
+                          const latestRecord =
+                            childData?.records?.[childData.records.length - 1];
+
+                          return (
+                            <Card
+                              key={child.id}
+                              className="bg-gradient-to-br from-gray-50 to-white border border-gray-200">
+                              <CardContent className="p-4">
+                                <div className="flex items-center gap-3 mb-3">
+                                  <Baby
+                                    className={`h-5 w-5 ${child.gender === 'MALE' ? 'text-blue-500' : 'text-pink-500'}`}
+                                  />
+                                  <div>
+                                    <h4 className="font-semibold text-gray-900">
+                                      {child.name}
+                                    </h4>
+                                    <p className="text-xs text-gray-500">
+                                      {child.gender === 'MALE'
+                                        ? 'Laki-laki'
+                                        : 'Perempuan'}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {latestRecord ? (
+                                  <div className="space-y-2">
+                                    <div className="grid grid-cols-2 gap-2 text-sm">
+                                      <div className="bg-blue-50 p-2 rounded">
+                                        <div className="text-xs text-blue-600 font-medium">
+                                          Tinggi
+                                        </div>
+                                        <div className="text-blue-800 font-semibold">
+                                          {latestRecord.height} cm
+                                        </div>
+                                      </div>
+                                      <div className="bg-green-50 p-2 rounded">
+                                        <div className="text-xs text-green-600 font-medium">
+                                          Berat
+                                        </div>
+                                        <div className="text-green-800 font-semibold">
+                                          {latestRecord.weight} kg
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                      Total pengukuran:{' '}
+                                      {childData?.records?.length || 0}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="text-center py-4">
+                                    <div className="text-gray-400 text-xs">
+                                      Belum ada data
+                                    </div>
+                                  </div>
+                                )}
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Combined Charts for All Children */}
+                <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+                  <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-t-lg p-4 sm:p-6">
+                    <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                      <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />
+                      <span>Grafik Perbandingan Semua Anak</span>
+                    </CardTitle>
+                    <CardDescription className="text-blue-100 text-sm sm:text-base">
+                      Visualisasi pertumbuhan semua anak dalam satu grafik
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-4 sm:p-6">
+                    {loadingData === 'all' ? (
+                      <GrowthChartSkeleton />
+                    ) : (
+                      <Tabs defaultValue="height" className="w-full">
+                        <TabsList className="grid w-full grid-cols-2 mb-4 sm:mb-6">
+                          <TabsTrigger
+                            value="height"
+                            className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-xs sm:text-sm">
+                            Tinggi Badan
+                          </TabsTrigger>
+                          <TabsTrigger
+                            value="weight"
+                            className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-xs sm:text-sm">
+                            Berat Badan
+                          </TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="height" className="space-y-4">
                           {children.map((child) => {
                             const childData = allChildrenData[child.id];
-                            const childStats = allChildrenStats[child.id];
-                            const latestRecord =
-                              childData?.records?.[
-                                childData.records.length - 1
-                              ];
-
-                            return (
-                              <Card
-                                key={child.id}
-                                className="bg-gradient-to-br from-gray-50 to-white border border-gray-200">
-                                <CardContent className="p-4">
-                                  <div className="flex items-center gap-3 mb-3">
-                                    <Baby
-                                      className={`h-5 w-5 ${child.gender === 'MALE' ? 'text-blue-500' : 'text-pink-500'}`}
-                                    />
-                                    <div>
-                                      <h4 className="font-semibold text-gray-900">
-                                        {child.name}
-                                      </h4>
-                                      <p className="text-xs text-gray-500">
-                                        {child.gender === 'MALE'
-                                          ? 'Laki-laki'
-                                          : 'Perempuan'}
-                                      </p>
-                                    </div>
-                                  </div>
-
-                                  {latestRecord ? (
-                                    <div className="space-y-2">
-                                      <div className="grid grid-cols-2 gap-2 text-sm">
-                                        <div className="bg-blue-50 p-2 rounded">
-                                          <div className="text-xs text-blue-600 font-medium">
-                                            Tinggi
-                                          </div>
-                                          <div className="text-blue-800 font-semibold">
-                                            {latestRecord.height} cm
-                                          </div>
-                                        </div>
-                                        <div className="bg-green-50 p-2 rounded">
-                                          <div className="text-xs text-green-600 font-medium">
-                                            Berat
-                                          </div>
-                                          <div className="text-green-800 font-semibold">
-                                            {latestRecord.weight} kg
-                                          </div>
-                                        </div>
-                                      </div>
-                                      <div className="text-xs text-gray-500">
-                                        Total pengukuran:{' '}
-                                        {childData?.records?.length || 0}
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <div className="text-center py-4">
-                                      <div className="text-gray-400 text-xs">
-                                        Belum ada data
-                                      </div>
-                                    </div>
-                                  )}
-                                </CardContent>
-                              </Card>
-                            );
+                            if (childData && childData.records.length > 0) {
+                              return (
+                                <div key={child.id} className="mb-6">
+                                  <GrowthChart
+                                    data={childData}
+                                    childName={child.name}
+                                    chartType="height"
+                                  />
+                                </div>
+                              );
+                            }
+                            return null;
                           })}
-                        </div>
-                      </CardContent>
-                    </Card>
+                        </TabsContent>
+                        <TabsContent value="weight" className="space-y-4">
+                          {children.map((child) => {
+                            const childData = allChildrenData[child.id];
+                            if (childData && childData.records.length > 0) {
+                              return (
+                                <div key={child.id} className="mb-6">
+                                  <GrowthChart
+                                    data={childData}
+                                    childName={child.name}
+                                    chartType="weight"
+                                  />
+                                </div>
+                              );
+                            }
+                            return null;
+                          })}
+                        </TabsContent>
+                      </Tabs>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
 
-                    {/* Combined Charts for All Children */}
-                    <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
-                      <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-t-lg p-4 sm:p-6">
-                        <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-                          <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />
-                          <span>Grafik Perbandingan Semua Anak</span>
-                        </CardTitle>
-                        <CardDescription className="text-blue-100 text-sm sm:text-base">
-                          Visualisasi pertumbuhan semua anak dalam satu grafik
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="p-4 sm:p-6">
-                        <Tabs defaultValue="height" className="w-full">
-                          <TabsList className="grid w-full grid-cols-2 mb-4 sm:mb-6">
-                            <TabsTrigger
-                              value="height"
-                              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-xs sm:text-sm">
-                              Tinggi Badan
-                            </TabsTrigger>
-                            <TabsTrigger
-                              value="weight"
-                              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-xs sm:text-sm">
-                              Berat Badan
-                            </TabsTrigger>
-                          </TabsList>
-                          <TabsContent value="height" className="space-y-4">
-                            {children.map((child) => {
-                              const childData = allChildrenData[child.id];
-                              if (childData && childData.records.length > 0) {
-                                return (
-                                  <div key={child.id} className="mb-6">
-                                    <GrowthChart
-                                      data={childData}
-                                      childName={child.name}
-                                      chartType="height"
-                                    />
-                                  </div>
-                                );
-                              }
-                              return null;
-                            })}
-                          </TabsContent>
-                          <TabsContent value="weight" className="space-y-4">
-                            {children.map((child) => {
-                              const childData = allChildrenData[child.id];
-                              if (childData && childData.records.length > 0) {
-                                return (
-                                  <div key={child.id} className="mb-6">
-                                    <GrowthChart
-                                      data={childData}
-                                      childName={child.name}
-                                      chartType="weight"
-                                    />
-                                  </div>
-                                );
-                              }
-                              return null;
-                            })}
-                          </TabsContent>
-                        </Tabs>
-                      </CardContent>
-                    </Card>
-                  </div>
+            {/* Individual Child View */}
+            {selectedView !== 'all' && currentViewData.child && (
+              <div className="space-y-8">
+                {/* Individual Child Stats */}
+                {loadingData === selectedView ? (
+                  <GrowthStatsSkeleton />
+                ) : (
+                  <GrowthStatsCard
+                    childName={currentViewData.child.name}
+                    stats={currentViewData.stats}
+                    latestRecord={
+                      currentViewData.data?.records?.[
+                        currentViewData.data.records.length - 1
+                      ]
+                    }
+                  />
                 )}
 
-                {/* Individual Child View */}
-                {selectedView !== 'all' && currentViewData.child && (
-                  <div className="space-y-8">
-                    {/* Individual Child Stats */}
-                    <GrowthStatsCard
-                      childName={currentViewData.child.name}
-                      stats={currentViewData.stats}
-                      latestRecord={
-                        currentViewData.data?.records?.[
-                          currentViewData.data.records.length - 1
-                        ]
-                      }
-                    />
-
-                    {/* Individual Child Records */}
-                    <ChildGrowthList
-                      childId={currentViewData.child.id}
-                      childName={currentViewData.child.name}
-                    />
-
-                    {/* Individual Child Charts */}
-                    {currentViewData.data &&
-                    currentViewData.data.records.length > 0 ? (
-                      <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
-                        <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-t-lg p-4 sm:p-6">
-                          <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-                            <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />
-                            <span className="truncate">
-                              Grafik - {currentViewData.child.name}
-                            </span>
-                          </CardTitle>
-                          <CardDescription className="text-blue-100 text-sm sm:text-base">
-                            Visualisasi perkembangan dengan kurva WHO
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent className="p-4 sm:p-6">
-                          <Tabs defaultValue="height" className="w-full">
-                            <TabsList className="grid w-full grid-cols-2 mb-4 sm:mb-6">
-                              <TabsTrigger
-                                value="height"
-                                className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-xs sm:text-sm">
-                                Tinggi Badan
-                              </TabsTrigger>
-                              <TabsTrigger
-                                value="weight"
-                                className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-xs sm:text-sm">
-                                Berat Badan
-                              </TabsTrigger>
-                            </TabsList>
-                            <TabsContent value="height" className="space-y-4">
-                              <GrowthChart
-                                data={currentViewData.data}
-                                childName={currentViewData.child.name}
-                                chartType="height"
-                              />
-                            </TabsContent>
-                            <TabsContent value="weight" className="space-y-4">
-                              <GrowthChart
-                                data={currentViewData.data}
-                                childName={currentViewData.child.name}
-                                chartType="weight"
-                              />
-                            </TabsContent>
-                          </Tabs>
-                        </CardContent>
-                      </Card>
-                    ) : (
-                      <Card className="text-center py-16 shadow-xl border-0 bg-gradient-to-br from-yellow-50 to-orange-50">
-                        <CardHeader>
-                          <div className="mx-auto w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mb-6">
-                            <TrendingUp className="h-10 w-10 text-yellow-600" />
+                {/* Individual Child Records */}
+                {loadingData === selectedView ? (
+                  <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+                    <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-t-lg p-6">
+                      <Skeleton className="h-6 w-48 bg-blue-400" />
+                      <Skeleton className="h-4 w-64 bg-blue-300 mt-2" />
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <div className="space-y-4">
+                        {[...Array(3)].map((_, i) => (
+                          <div
+                            key={i}
+                            className="p-4 border rounded-lg bg-white">
+                            <Skeleton className="h-5 w-40 bg-gray-400 mb-2" />
+                            <div className="grid grid-cols-2 gap-4">
+                              <Skeleton className="h-4 w-32 bg-gray-300" />
+                              <Skeleton className="h-4 w-32 bg-gray-300" />
+                            </div>
                           </div>
-                          <CardTitle className="text-2xl text-yellow-800">
-                            Belum Ada Data Pengukuran
-                          </CardTitle>
-                          <CardDescription className="max-w-lg mx-auto text-yellow-700">
-                            Data pengukuran pertumbuhan untuk{' '}
-                            {currentViewData.child.name} belum tersedia.
-                          </CardDescription>
-                        </CardHeader>
-                      </Card>
-                    )}
-                  </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <ChildGrowthList
+                    childId={currentViewData.child.id}
+                    childName={currentViewData.child.name}
+                  />
+                )}
+
+                {/* Individual Child Charts */}
+                {loadingData === selectedView ? (
+                  <GrowthChartSkeleton />
+                ) : currentViewData.data &&
+                  currentViewData.data.records.length > 0 ? (
+                  <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+                    <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-t-lg p-4 sm:p-6">
+                      <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                        <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />
+                        <span className="truncate">
+                          Grafik - {currentViewData.child.name}
+                        </span>
+                      </CardTitle>
+                      <CardDescription className="text-blue-100 text-sm sm:text-base">
+                        Visualisasi perkembangan dengan kurva WHO
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-4 sm:p-6">
+                      <Tabs defaultValue="height" className="w-full">
+                        <TabsList className="grid w-full grid-cols-2 mb-4 sm:mb-6">
+                          <TabsTrigger
+                            value="height"
+                            className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-xs sm:text-sm">
+                            Tinggi Badan
+                          </TabsTrigger>
+                          <TabsTrigger
+                            value="weight"
+                            className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-xs sm:text-sm">
+                            Berat Badan
+                          </TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="height" className="space-y-4">
+                          <GrowthChart
+                            data={currentViewData.data}
+                            childName={currentViewData.child.name}
+                            chartType="height"
+                          />
+                        </TabsContent>
+                        <TabsContent value="weight" className="space-y-4">
+                          <GrowthChart
+                            data={currentViewData.data}
+                            childName={currentViewData.child.name}
+                            chartType="weight"
+                          />
+                        </TabsContent>
+                      </Tabs>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  !loadingData && (
+                    <Card className="text-center py-16 shadow-xl border-0 bg-gradient-to-br from-yellow-50 to-orange-50">
+                      <CardHeader>
+                        <div className="mx-auto w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mb-6">
+                          <TrendingUp className="h-10 w-10 text-yellow-600" />
+                        </div>
+                        <CardTitle className="text-2xl text-yellow-800">
+                          Belum Ada Data Pengukuran
+                        </CardTitle>
+                        <CardDescription className="max-w-lg mx-auto text-yellow-700">
+                          Data pengukuran pertumbuhan untuk{' '}
+                          {currentViewData.child.name} belum tersedia.
+                        </CardDescription>
+                      </CardHeader>
+                    </Card>
+                  )
                 )}
               </div>
             )}
